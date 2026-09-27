@@ -4,11 +4,15 @@ import co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta;
 import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
 import co.edu.unicauca.bancopreguntas.domain.repositories.PreguntaRepository;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 public class PreguntaService {
     private final PreguntaRepository preguntaRepository;
+
+    /** Longitud mínima exigida a cada distractor (RF-13). */
+    private static final int MIN_LONGITUD_DISTRACTOR = 10;
 
     public PreguntaService(PreguntaRepository preguntaRepository) {
         this.preguntaRepository = preguntaRepository;
@@ -46,11 +50,11 @@ public class PreguntaService {
             throw new IllegalArgumentException("La pregunta no existe");
         }
         Pregunta pregunta = opt.get();
-        
+
         if (pregunta.getAutorId() != autorId) {
             throw new IllegalArgumentException("No tiene permisos para modificar el estado de esta pregunta");
         }
-        
+
         if (pregunta.getEstado() != EstadoPregunta.BORRADOR) {
             throw new IllegalArgumentException("Solo las preguntas en estado Borrador pueden enviarse a revisión");
         }
@@ -70,6 +74,10 @@ public class PreguntaService {
         return preguntaRepository.buscarPorId(preguntaId).orElse(null);
     }
 
+    // -------------------------------------------------------------------------
+    // Métodos de validación privados
+    // -------------------------------------------------------------------------
+
     private void validarCampos(Pregunta pregunta) {
         if (pregunta.getContexto() == null || pregunta.getContexto().trim().isEmpty() ||
             pregunta.getPreguntaDirecta() == null || pregunta.getPreguntaDirecta().trim().isEmpty()) {
@@ -85,6 +93,11 @@ public class PreguntaService {
 
         if (pregunta.getRespuestaCorrecta() == null || pregunta.getRespuestaCorrecta().trim().isEmpty()) {
             throw new IllegalArgumentException("Debe seleccionar una respuesta correcta");
+        }
+
+        // HU01: justificación obligatoria
+        if (pregunta.getJustificacion() == null || pregunta.getJustificacion().trim().isEmpty()) {
+            throw new IllegalArgumentException("Debe registrar la justificación de la respuesta");
         }
 
         if (pregunta.getNivelDificultad() == null || pregunta.getNivelDificultad().trim().isEmpty()) {
@@ -113,6 +126,9 @@ public class PreguntaService {
         validarEstructuraDistractor(pregunta.getDistractor2());
         validarEstructuraDistractor(pregunta.getDistractor3());
         validarEstructuraDistractor(pregunta.getDistractor4());
+
+        // RF-13 extra: distractores no pueden ser idénticos entre sí ni iguales a la pregunta directa
+        validarDistractoresSinDuplicados(pregunta);
     }
 
     private void validarExpresionesProhibidas(String texto) {
@@ -123,20 +139,51 @@ public class PreguntaService {
                      .replaceAll("[íìïî]", "i")
                      .replaceAll("[óòöôõ]", "o")
                      .replaceAll("[úùüû]", "u");
-        
+
         if (lower.contains("todas las anteriores") || lower.contains("ninguna de las anteriores")) {
             throw new IllegalArgumentException("No se permiten expresiones como 'Todas las anteriores' o 'Ninguna de las anteriores'");
         }
     }
 
+    /**
+     * RF-13: Verifica que el distractor tenga longitud mínima razonable y
+     * al menos una palabra con más de 2 letras (evita strings triviales como "xx xx").
+     */
     private void validarEstructuraDistractor(String distractor) {
         if (distractor == null) return;
         String trimmed = distractor.trim();
-        // Nota: Se cubre longitud mínima y no-vacío como interpretación razonable de RF-13 
-        // para este corte. Una validación gramatical profunda no es automatizable con certeza aquí.
-        final int MIN_LONGITUD_DISTRACTOR = 3; 
         if (trimmed.length() < MIN_LONGITUD_DISTRACTOR) {
             throw new IllegalArgumentException("Los distractores deben cumplir con una longitud y estructura mínimas");
+        }
+        // Al menos una palabra con más de 2 letras
+        boolean tieneWordSignificativa = Arrays.stream(trimmed.split("\\s+"))
+            .anyMatch(w -> w.length() > 2);
+        if (!tieneWordSignificativa) {
+            throw new IllegalArgumentException("Los distractores deben cumplir con una longitud y estructura mínimas");
+        }
+    }
+
+    /**
+     * RF-13 extra: rechaza distractores idénticos entre sí y distractor igual a la pregunta directa.
+     */
+    private void validarDistractoresSinDuplicados(Pregunta pregunta) {
+        List<String> distractores = Arrays.asList(
+            pregunta.getDistractor1().trim(),
+            pregunta.getDistractor2().trim(),
+            pregunta.getDistractor3().trim(),
+            pregunta.getDistractor4().trim()
+        );
+        long distintos = distractores.stream().map(String::toLowerCase).distinct().count();
+        if (distintos < distractores.size()) {
+            throw new IllegalArgumentException("Los distractores no pueden ser idénticos entre sí");
+        }
+        // Ningún distractor puede ser igual al enunciado de la pregunta directa
+        String pd = pregunta.getPreguntaDirecta().trim().toLowerCase();
+        for (String d : distractores) {
+            if (d.toLowerCase().equals(pd)) {
+                throw new IllegalArgumentException(
+                    "Un distractor no puede ser igual al enunciado de la pregunta directa");
+            }
         }
     }
 }

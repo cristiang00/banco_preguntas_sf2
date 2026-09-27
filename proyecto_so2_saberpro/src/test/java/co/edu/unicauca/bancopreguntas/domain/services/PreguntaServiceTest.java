@@ -24,15 +24,19 @@ class PreguntaServiceTest {
         preguntaService = new PreguntaService(preguntaRepository);
     }
 
+    /**
+     * Construye una pregunta válida para los tests — incluye justificacion.
+     */
     private Pregunta crearPreguntaValida() {
         Pregunta p = new Pregunta();
         p.setContexto("Contexto de prueba");
         p.setPreguntaDirecta("Pregunta directa de prueba");
-        p.setDistractor1("Distractor A");
-        p.setDistractor2("Distractor B");
-        p.setDistractor3("Distractor C");
-        p.setDistractor4("Distractor D");
+        p.setDistractor1("Distractor Alpha");   // 16 chars, tiene palabra >2
+        p.setDistractor2("Distractor Beta");    // 15 chars
+        p.setDistractor3("Distractor Gamma");   // 16 chars
+        p.setDistractor4("Distractor Delta");   // 16 chars
         p.setRespuestaCorrecta("A");
+        p.setJustificacion("Justificación de prueba completa");   // HU01: campo obligatorio
         p.setNivelDificultad("Bajo");
         p.setBibliografia("Biblio");
         p.setCompetencia("Comp");
@@ -63,6 +67,24 @@ class PreguntaServiceTest {
         p.setRespuestaCorrecta(null);
         Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
         assertEquals("Debe seleccionar una respuesta correcta", e.getMessage());
+    }
+
+    // --- Tests HU01: justificación obligatoria ---
+
+    @Test
+    void crearPregunta_sinJustificacion_lanzaExcepcion() {
+        Pregunta p = crearPreguntaValida();
+        p.setJustificacion("");
+        Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
+        assertEquals("Debe registrar la justificación de la respuesta", e.getMessage());
+    }
+
+    @Test
+    void crearPregunta_justificacionNull_lanzaExcepcion() {
+        Pregunta p = crearPreguntaValida();
+        p.setJustificacion(null);
+        Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
+        assertEquals("Debe registrar la justificación de la respuesta", e.getMessage());
     }
 
     @Test
@@ -163,7 +185,8 @@ class PreguntaServiceTest {
         assertEquals(1, resultados.size());
     }
 
-    // --- Tests para RF-12 (Expresiones prohibidas) ---
+    // --- Tests RF-12 (Expresiones prohibidas) ---
+
     @Test
     void crearPregunta_conTodasLasAnterioresEnPregunta_lanzaExcepcion() {
         Pregunta p = crearPreguntaValida();
@@ -175,7 +198,6 @@ class PreguntaServiceTest {
     @Test
     void crearPregunta_conNingunaDeLasAnterioresEnDistractor_lanzaExcepcion() {
         Pregunta p = crearPreguntaValida();
-        // Prueba con tildes y mayúsculas
         p.setDistractor1("NíngunA dE lAs antEriores");
         Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
         assertEquals("No se permiten expresiones como 'Todas las anteriores' o 'Ninguna de las anteriores'", e.getMessage());
@@ -189,11 +211,12 @@ class PreguntaServiceTest {
         assertEquals("No se permiten expresiones como 'Todas las anteriores' o 'Ninguna de las anteriores'", e.getMessage());
     }
 
-    // --- Tests para RF-13 (Longitud y estructura mínima de distractores) ---
+    // --- Tests RF-13 (Longitud y estructura mínima de distractores) ---
+
     @Test
     void crearPregunta_distractorVacioOMuyCorto_lanzaExcepcion() {
         Pregunta p = crearPreguntaValida();
-        p.setDistractor2("   A   "); // Solo 1 caracter util
+        p.setDistractor2("Corto"); // 5 chars < 10
         Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
         assertEquals("Los distractores deben cumplir con una longitud y estructura mínimas", e.getMessage());
     }
@@ -201,7 +224,24 @@ class PreguntaServiceTest {
     @Test
     void crearPregunta_distractorInvalidoEnOtraOpcion_lanzaExcepcion() {
         Pregunta p = crearPreguntaValida();
-        p.setDistractor4("NO"); // 2 caracteres, el mínimo es 3
+        p.setDistractor4("NO"); // 2 caracteres
+        Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
+        assertEquals("Los distractores deben cumplir con una longitud y estructura mínimas", e.getMessage());
+    }
+
+    @Test
+    void crearPregunta_distractoresDuplicados_lanzaExcepcion() {
+        Pregunta p = crearPreguntaValida();
+        p.setDistractor1("Distractor repetido exacto");
+        p.setDistractor2("Distractor repetido exacto");
+        Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
+        assertEquals("Los distractores no pueden ser idénticos entre sí", e.getMessage());
+    }
+
+    @Test
+    void crearPregunta_distractorMuyCortoEspecifico_lanzaExcepcion() {
+        Pregunta p = crearPreguntaValida();
+        p.setDistractor3("Breve"); // < 10 chars
         Exception e = assertThrows(IllegalArgumentException.class, () -> preguntaService.crearPregunta(p, 1));
         assertEquals("Los distractores deben cumplir con una longitud y estructura mínimas", e.getMessage());
     }

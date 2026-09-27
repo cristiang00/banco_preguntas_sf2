@@ -19,14 +19,17 @@ public class PreguntaRepositorySQLite implements PreguntaRepository {
         this.conexion = conexion;
     }
 
+    //
     @Override
     public void guardar(Pregunta pregunta) {
         String sql = "INSERT INTO preguntas (contexto, pregunta_directa, distractor1, distractor2, distractor3, distractor4, respuesta_correcta, justificacion, bibliografia, competencia, tema, subtema, nivel_dificultad, estado, autor_id, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = conexion.getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = conexion.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             setPreparedStatementParameters(ps, pregunta);
             ps.setString(14, pregunta.getEstado().name());
             ps.setInt(15, pregunta.getAutorId());
-            ps.setString(16, pregunta.getFechaCreacion() != null ? pregunta.getFechaCreacion().format(FORMATTER) : LocalDateTime.now().format(FORMATTER));
+            ps.setString(16, pregunta.getFechaCreacion() != null ? pregunta.getFechaCreacion().format(FORMATTER)
+                    : LocalDateTime.now().format(FORMATTER));
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -97,17 +100,19 @@ public class PreguntaRepositorySQLite implements PreguntaRepository {
     }
 
     @Override
-    public List<Pregunta> listarPorAutor(int autorId, List<EstadoPregunta> estadosFiltro, String nivelDificultad, int offset, int limit) {
-        StringBuilder sql = new StringBuilder("SELECT p.*, u.nombre_completo AS autor_nombre FROM preguntas p JOIN usuarios u ON p.autor_id = u.id WHERE 1=1");
+    public List<Pregunta> listarPorAutor(int autorId, List<EstadoPregunta> estadosFiltro, String nivelDificultad,
+            int offset, int limit) {
+        StringBuilder sql = new StringBuilder(
+                "SELECT p.*, u.nombre_completo AS autor_nombre FROM preguntas p JOIN usuarios u ON p.autor_id = u.id WHERE 1=1");
         List<Object> params = new ArrayList<>();
-        
+
         if (autorId != -1) {
             sql.append(" AND p.autor_id = ?");
             params.add(autorId);
         }
 
         appendFiltros(sql, params, estadosFiltro, nivelDificultad);
-        
+
         sql.append(" ORDER BY p.fecha_creacion DESC LIMIT ? OFFSET ?");
         params.add(limit);
         params.add(offset);
@@ -119,7 +124,7 @@ public class PreguntaRepositorySQLite implements PreguntaRepository {
     public int contarPorAutor(int autorId, List<EstadoPregunta> estadosFiltro, String nivelDificultad) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM preguntas p WHERE 1=1");
         List<Object> params = new ArrayList<>();
-        
+
         if (autorId != -1) {
             sql.append(" AND p.autor_id = ?");
             params.add(autorId);
@@ -132,7 +137,8 @@ public class PreguntaRepositorySQLite implements PreguntaRepository {
                 ps.setObject(i + 1, params.get(i));
             }
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
+                if (rs.next())
+                    return rs.getInt(1);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Error al contar preguntas: " + e.getMessage(), e);
@@ -140,12 +146,14 @@ public class PreguntaRepositorySQLite implements PreguntaRepository {
         return 0;
     }
 
-    private void appendFiltros(StringBuilder sql, List<Object> params, List<EstadoPregunta> estadosFiltro, String nivelDificultad) {
+    private void appendFiltros(StringBuilder sql, List<Object> params, List<EstadoPregunta> estadosFiltro,
+            String nivelDificultad) {
         if (estadosFiltro != null && !estadosFiltro.isEmpty()) {
             sql.append(" AND p.estado IN (");
             for (int i = 0; i < estadosFiltro.size(); i++) {
                 sql.append("?");
-                if (i < estadosFiltro.size() - 1) sql.append(",");
+                if (i < estadosFiltro.size() - 1)
+                    sql.append(",");
                 params.add(estadosFiltro.get(i).name());
             }
             sql.append(")");
@@ -192,7 +200,7 @@ public class PreguntaRepositorySQLite implements PreguntaRepository {
         p.setEstado(EstadoPregunta.valueOf(rs.getString("estado")));
         p.setAutorId(rs.getInt("autor_id"));
         p.setFechaCreacion(LocalDateTime.parse(rs.getString("fecha_creacion"), FORMATTER));
-        
+
         // El JOIN nos da el nombre del autor
         try {
             p.setAutorNombre(rs.getString("autor_nombre"));
@@ -201,4 +209,28 @@ public class PreguntaRepositorySQLite implements PreguntaRepository {
         }
         return p;
     }
+
+    @Override
+    public List<Pregunta> listarPorEstado(EstadoPregunta estado, int offset, int limit) {
+        String sql = "SELECT p.*, u.nombre_completo AS autor_nombre FROM preguntas p "
+                   + "JOIN usuarios u ON p.autor_id = u.id "
+                   + "WHERE p.estado = ? ORDER BY p.fecha_creacion DESC LIMIT ? OFFSET ?";
+        return ejecutarQueryLista(sql, java.util.List.of(estado.name(), limit, offset));
+    }
+
+    @Override
+    public int contarPorEstado(EstadoPregunta estado) {
+        String sql = "SELECT COUNT(*) FROM preguntas WHERE estado = ?";
+        try (Connection conn = conexion.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, estado.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error al contar preguntas por estado: " + e.getMessage(), e);
+        }
+        return 0;
+    }
 }
+

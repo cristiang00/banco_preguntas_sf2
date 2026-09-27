@@ -1,13 +1,24 @@
 package co.edu.unicauca.bancopreguntas.presentation.views;
 
 import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
+import co.edu.unicauca.bancopreguntas.domain.entities.PreguntaBuilder;
 import co.edu.unicauca.bancopreguntas.presentation.controllers.PreguntaController;
-import javax.swing.*;
-import java.awt.*;
 import co.edu.unicauca.bancopreguntas.presentation.utils.UIUtils;
 
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+
+/**
+ * Panel para crear una nueva pregunta.
+ * Muestra un banner inline verde (éxito) o rojo (error) en lugar de JOptionPane,
+ * siguiendo el estilo del prototipo de interfaz.
+ */
 public class CrearPreguntaPanel extends JPanel {
+
     private final PreguntaController preguntaController;
+
+    // Campos del formulario
     private JTextArea txtContexto;
     private JTextArea txtPreguntaDirecta;
     private JTextField txtDistractorA;
@@ -22,180 +33,238 @@ public class CrearPreguntaPanel extends JPanel {
     private JComboBox<String> cmbSubtema;
     private JComboBox<String> cmbDificultad;
 
+    // Banner de retroalimentación inline (éxito / error)
+    private JPanel bannerPanel;
+    private JLabel bannerLabel;
+
     public CrearPreguntaPanel(PreguntaController preguntaController) {
         this.preguntaController = preguntaController;
         inicializarUI();
     }
 
     private void inicializarUI() {
-        setLayout(new BorderLayout(10, 10));
+        setLayout(new BorderLayout(0, 0));
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        setBackground(UIUtils.COLOR_BACKGROUND);
 
+        // ── Título ──────────────────────────────────────────────────────────
         JLabel lblTitulo = new JLabel("Crear Nueva Pregunta", SwingConstants.CENTER);
         lblTitulo.setFont(UIUtils.FONT_TITLE);
-        add(lblTitulo, BorderLayout.NORTH);
+        lblTitulo.setForeground(UIUtils.COLOR_TEXT_PRIMARY);
+        lblTitulo.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
+        // ── Banner de retroalimentación (oculto por defecto) ─────────────────
+        bannerPanel = new JPanel(new BorderLayout());
+        bannerPanel.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+        bannerPanel.setOpaque(true);
+        bannerLabel = new JLabel("", SwingConstants.LEFT);
+        bannerLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        bannerPanel.add(bannerLabel, BorderLayout.CENTER);
+        bannerPanel.setVisible(false);
+
+        JPanel topPanel = new JPanel(new BorderLayout(0, 8));
+        topPanel.setOpaque(false);
+        topPanel.add(lblTitulo, BorderLayout.NORTH);
+        topPanel.add(bannerPanel, BorderLayout.SOUTH);
+
+        add(topPanel, BorderLayout.NORTH);
+
+        // ── Formulario ───────────────────────────────────────────────────────
         JPanel formPanel = new JPanel(new GridBagLayout());
+        formPanel.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.WEST;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
 
         int y = 0;
 
-        // Contexto
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Contexto:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
-        txtContexto = new JTextArea(3, 40);
-        UIUtils.stylizeTextField(txtContexto);
-        formPanel.add(new JScrollPane(txtContexto), gbc);
-        y++;
+        // Contexto *
+        y = agregarCampoArea(formPanel, gbc, y, "Contexto: *", txtContexto = new JTextArea(3, 40), true);
 
-        // Pregunta Directa
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Pregunta Directa:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
-        txtPreguntaDirecta = new JTextArea(2, 40);
-        UIUtils.stylizeTextField(txtPreguntaDirecta);
-        formPanel.add(new JScrollPane(txtPreguntaDirecta), gbc);
-        y++;
+        // Pregunta Directa *
+        y = agregarCampoArea(formPanel, gbc, y, "Pregunta Directa: *", txtPreguntaDirecta = new JTextArea(2, 40), true);
 
-        // Distractor A
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Distractor A:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Distractor A *
         txtDistractorA = new JTextField();
-        UIUtils.stylizeTextField(txtDistractorA);
-        formPanel.add(txtDistractorA, gbc);
-        y++;
+        y = agregarCampoField(formPanel, gbc, y, "Distractor A: *", txtDistractorA, true);
 
-        // Distractor B
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Distractor B:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Distractor B *
         txtDistractorB = new JTextField();
-        UIUtils.stylizeTextField(txtDistractorB);
-        formPanel.add(txtDistractorB, gbc);
-        y++;
+        y = agregarCampoField(formPanel, gbc, y, "Distractor B: *", txtDistractorB, true);
 
-        // Distractor C
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Distractor C:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Distractor C *
         txtDistractorC = new JTextField();
-        UIUtils.stylizeTextField(txtDistractorC);
-        formPanel.add(txtDistractorC, gbc);
-        y++;
+        y = agregarCampoField(formPanel, gbc, y, "Distractor C: *", txtDistractorC, true);
 
-        // Distractor D
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Distractor D:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Distractor D *
         txtDistractorD = new JTextField();
-        UIUtils.stylizeTextField(txtDistractorD);
-        formPanel.add(txtDistractorD, gbc);
-        y++;
+        y = agregarCampoField(formPanel, gbc, y, "Distractor D: *", txtDistractorD, true);
 
-        // Respuesta Correcta
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Respuesta Correcta:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Respuesta Correcta *
         cmbRespuestaCorrecta = new JComboBox<>(new String[]{"", "A", "B", "C", "D"});
         UIUtils.stylizeTextField(cmbRespuestaCorrecta);
-        formPanel.add(cmbRespuestaCorrecta, gbc);
-        y++;
+        y = agregarCampoCombo(formPanel, gbc, y, "Respuesta Correcta: *", cmbRespuestaCorrecta, true);
 
-        // Justificación
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Justificación:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
-        txtJustificacion = new JTextArea(2, 40);
-        UIUtils.stylizeTextField(txtJustificacion);
-        formPanel.add(new JScrollPane(txtJustificacion), gbc);
-        y++;
+        // Justificación * (HU01: campo obligatorio)
+        y = agregarCampoArea(formPanel, gbc, y, "Justificación: *", txtJustificacion = new JTextArea(2, 40), true);
 
-        // Bibliografía
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Bibliografía:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
-        txtBibliografia = new JTextArea(2, 40);
-        UIUtils.stylizeTextField(txtBibliografia);
-        formPanel.add(new JScrollPane(txtBibliografia), gbc);
-        y++;
+        // Bibliografía *
+        y = agregarCampoArea(formPanel, gbc, y, "Bibliografía: *", txtBibliografia = new JTextArea(2, 40), true);
 
-        // Competencia
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Competencia:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Competencia *
         cmbCompetencia = new JComboBox<>(new String[]{"", "Lectura Crítica", "Razonamiento Cuantitativo", "Competencias Ciudadanas"});
         cmbCompetencia.setEditable(true);
         UIUtils.stylizeTextField(cmbCompetencia);
-        formPanel.add(cmbCompetencia, gbc);
-        y++;
+        y = agregarCampoCombo(formPanel, gbc, y, "Competencia: *", cmbCompetencia, true);
 
-        // Tema
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Tema:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Tema *
         cmbTema = new JComboBox<>(new String[]{"", "Matemáticas", "Ciencias", "Humanidades"});
         cmbTema.setEditable(true);
         UIUtils.stylizeTextField(cmbTema);
-        formPanel.add(cmbTema, gbc);
-        y++;
+        y = agregarCampoCombo(formPanel, gbc, y, "Tema: *", cmbTema, true);
 
-        // Subtema
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Subtema:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Subtema *
         cmbSubtema = new JComboBox<>(new String[]{"", "Álgebra", "Biología", "Historia"});
         cmbSubtema.setEditable(true);
         UIUtils.stylizeTextField(cmbSubtema);
-        formPanel.add(cmbSubtema, gbc);
-        y++;
+        y = agregarCampoCombo(formPanel, gbc, y, "Subtema: *", cmbSubtema, true);
 
-        // Dificultad
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
-        formPanel.add(new JLabel("Dificultad:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        // Dificultad *
         cmbDificultad = new JComboBox<>(new String[]{"", "Bajo", "Medio", "Alto"});
         UIUtils.stylizeTextField(cmbDificultad);
-        formPanel.add(cmbDificultad, gbc);
+        agregarCampoCombo(formPanel, gbc, y, "Dificultad: *", cmbDificultad, true);
 
         JScrollPane mainScrollPane = new JScrollPane(formPanel);
+        mainScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        mainScrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(mainScrollPane, BorderLayout.CENTER);
 
-        JPanel buttonPanel = new JPanel();
+        // ── Botones ──────────────────────────────────────────────────────────
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        buttonPanel.setOpaque(false);
+
+        JButton btnLimpiar = new JButton("Limpiar");
+        UIUtils.stylizeSecondaryButton(btnLimpiar);
+        btnLimpiar.addActionListener(e -> limpiarCampos());
+        buttonPanel.add(btnLimpiar);
+
         JButton btnGuardar = new JButton("Guardar");
         UIUtils.stylizePrimaryButton(btnGuardar);
         btnGuardar.addActionListener(e -> guardarPregunta());
         buttonPanel.add(btnGuardar);
+
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
+    // ── Helpers de layout ─────────────────────────────────────────────────────
+
+    private int agregarCampoArea(JPanel panel, GridBagConstraints gbc, int y,
+                                  String labelText, JTextArea area, boolean obligatorio) {
+        UIUtils.stylizeTextField(area);
+        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
+        panel.add(crearLabel(labelText, obligatorio), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        panel.add(new JScrollPane(area), gbc);
+        return y + 1;
+    }
+
+    private int agregarCampoField(JPanel panel, GridBagConstraints gbc, int y,
+                                   String labelText, JTextField field, boolean obligatorio) {
+        UIUtils.stylizeTextField(field);
+        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
+        panel.add(crearLabel(labelText, obligatorio), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        panel.add(field, gbc);
+        return y + 1;
+    }
+
+    private int agregarCampoCombo(JPanel panel, GridBagConstraints gbc, int y,
+                                   String labelText, JComboBox<?> combo, boolean obligatorio) {
+        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
+        panel.add(crearLabel(labelText, obligatorio), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        panel.add(combo, gbc);
+        return y + 1;
+    }
+
+    /**
+     * Crea un label con texto rojo para obligatorios, gris para opcionales.
+     */
+    private JLabel crearLabel(String texto, boolean obligatorio) {
+        JLabel lbl = new JLabel(texto);
+        lbl.setFont(UIUtils.FONT_REGULAR);
+        lbl.setForeground(obligatorio
+            ? new Color(220, 53, 69)    // rojo: campo obligatorio
+            : new Color(108, 117, 125)); // gris: campo opcional
+        return lbl;
+    }
+
+    // ── Lógica principal ──────────────────────────────────────────────────────
+
     private void guardarPregunta() {
-        Pregunta p = new Pregunta();
-        p.setContexto(txtContexto.getText());
-        p.setPreguntaDirecta(txtPreguntaDirecta.getText());
-        p.setDistractor1(txtDistractorA.getText());
-        p.setDistractor2(txtDistractorB.getText());
-        p.setDistractor3(txtDistractorC.getText());
-        p.setDistractor4(txtDistractorD.getText());
-        p.setRespuestaCorrecta((String) cmbRespuestaCorrecta.getSelectedItem());
-        p.setJustificacion(txtJustificacion.getText());
-        p.setBibliografia(txtBibliografia.getText());
-        p.setCompetencia(cmbCompetencia.getSelectedItem() != null ? cmbCompetencia.getSelectedItem().toString() : "");
-        p.setTema(cmbTema.getSelectedItem() != null ? cmbTema.getSelectedItem().toString() : "");
-        p.setSubtema(cmbSubtema.getSelectedItem() != null ? cmbSubtema.getSelectedItem().toString() : "");
-        p.setNivelDificultad((String) cmbDificultad.getSelectedItem());
+        ocultarBanner();
+
+        Pregunta p = new PreguntaBuilder()
+            .conContexto(txtContexto.getText())
+            .conPreguntaDirecta(txtPreguntaDirecta.getText())
+            .conDistractor1(txtDistractorA.getText())
+            .conDistractor2(txtDistractorB.getText())
+            .conDistractor3(txtDistractorC.getText())
+            .conDistractor4(txtDistractorD.getText())
+            .conRespuestaCorrecta((String) cmbRespuestaCorrecta.getSelectedItem())
+            .conJustificacion(txtJustificacion.getText())
+            .conBibliografia(txtBibliografia.getText())
+            .conCompetencia(cmbCompetencia.getSelectedItem() != null
+                ? cmbCompetencia.getSelectedItem().toString() : "")
+            .conTema(cmbTema.getSelectedItem() != null
+                ? cmbTema.getSelectedItem().toString() : "")
+            .conSubtema(cmbSubtema.getSelectedItem() != null
+                ? cmbSubtema.getSelectedItem().toString() : "")
+            .conNivelDificultad((String) cmbDificultad.getSelectedItem())
+            .build();
 
         try {
             preguntaController.crearPregunta(p);
-            JOptionPane.showMessageDialog(this, "Pregunta guardada en estado Borrador exitosamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+            mostrarBannerExito("✓  Pregunta guardada correctamente en estado \"En borrador\"");
             limpiarCampos();
         } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            mostrarBannerError("✕  " + ex.getMessage());
         }
+    }
+
+    private void mostrarBannerExito(String mensaje) {
+        bannerLabel.setText(mensaje);
+        bannerLabel.setForeground(new Color(21, 87, 36));      // verde oscuro
+        bannerPanel.setBackground(new Color(212, 237, 218));   // verde claro
+        bannerPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(195, 230, 203), 1, true),
+            new EmptyBorder(8, 14, 8, 14)));
+        bannerPanel.setVisible(true);
+        revalidate();
+        repaint();
+        // Auto-ocultar a los 5 segundos
+        Timer t = new Timer(5000, e -> ocultarBanner());
+        t.setRepeats(false);
+        t.start();
+    }
+
+    private void mostrarBannerError(String mensaje) {
+        bannerLabel.setText(mensaje);
+        bannerLabel.setForeground(new Color(114, 28, 36));     // rojo oscuro
+        bannerPanel.setBackground(new Color(248, 215, 218));   // rojo claro
+        bannerPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(245, 198, 203), 1, true),
+            new EmptyBorder(8, 14, 8, 14)));
+        bannerPanel.setVisible(true);
+        revalidate();
+        repaint();
+    }
+
+    private void ocultarBanner() {
+        bannerPanel.setVisible(false);
+        revalidate();
+        repaint();
     }
 
     private void limpiarCampos() {

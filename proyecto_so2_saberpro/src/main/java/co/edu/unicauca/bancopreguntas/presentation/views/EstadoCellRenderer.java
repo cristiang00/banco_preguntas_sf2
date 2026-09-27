@@ -15,9 +15,10 @@ public class EstadoCellRenderer extends DefaultTableCellRenderer {
             setText(estado.getLabel());
             if (!isSelected) {
                 c.setBackground(estado.getColor());
-                c.setForeground(Color.WHITE);
+                c.setForeground(estado.getTextColor());
             }
         }
+
         setHorizontalAlignment(SwingConstants.CENTER);
         return c;
     }

@@ -30,6 +30,20 @@ public enum EstadoPregunta {
         return color;
     }
 
+    /**
+     * Calcula el color de texto con contraste adecuado según la luminancia del fondo.
+     * Texto oscuro sobre fondos claros, texto blanco sobre fondos oscuros
+     * (equivalente a WCAG AA ~4.5:1 para los valores usados).
+     *
+     * @return {@code Color.WHITE} o gris oscuro {@code #212529}
+     */
+    public Color getTextColor() {
+        double luminancia = (0.299 * color.getRed()
+                           + 0.587 * color.getGreen()
+                           + 0.114 * color.getBlue()) / 255.0;
+        return luminancia > 0.6 ? new Color(33, 37, 41) : Color.WHITE;
+    }
+
     @Override
     public String toString() {
         return label;

@@ -1,5 +1,8 @@
 package com.unicauca.taller2.usuarios.presentation;
 
+import co.edu.unicauca.bancopreguntas.domain.repositories.NotificacionRepository;
+import co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel;
+import co.edu.unicauca.bancopreguntas.presentation.views.ToastNotificadorAsignacion;
 import com.unicauca.taller2.usuarios.services.UsuarioService;
 import com.unicauca.taller2.usuarios.model.Usuario;
 
@@ -16,19 +19,26 @@ public class MenuAdministradorFrame extends JFrame {
     private final UsuarioService usuarioService;
     private final LoginFrame loginFrame;
     private final co.edu.unicauca.bancopreguntas.presentation.controllers.AsignacionRevisorController asignacionController;
+    private final NotificacionRepository notificacionRepository;
 
     /**
      * Constructor del menú de administrador.
      *
-     * @param usuario        usuario administrador autenticado
-     * @param usuarioService servicio de usuarios
-     * @param loginFrame     ventana de inicio de sesión
+     * @param usuario                 usuario administrador autenticado
+     * @param usuarioService          servicio de usuarios
+     * @param loginFrame              ventana de inicio de sesión
+     * @param asignacionController    controlador de asignación de revisores
+     * @param notificacionRepository  repositorio de notificaciones para el historial
      */
-    public MenuAdministradorFrame(Usuario usuario, UsuarioService usuarioService, LoginFrame loginFrame, co.edu.unicauca.bancopreguntas.presentation.controllers.AsignacionRevisorController asignacionController) {
+    public MenuAdministradorFrame(Usuario usuario, UsuarioService usuarioService,
+                                   LoginFrame loginFrame,
+                                   co.edu.unicauca.bancopreguntas.presentation.controllers.AsignacionRevisorController asignacionController,
+                                   NotificacionRepository notificacionRepository) {
         this.usuario = usuario;
         this.usuarioService = usuarioService;
         this.loginFrame = loginFrame;
         this.asignacionController = asignacionController;
+        this.notificacionRepository = notificacionRepository;
         inicializarUI();
     }
 
@@ -84,7 +94,8 @@ public class MenuAdministradorFrame extends JFrame {
             btnBancoPreguntas.addActionListener(e -> {
                 try {
                     JDialog dialog = new JDialog(MenuAdministradorFrame.this, "Gestión de Preguntas", true);
-                    co.edu.unicauca.bancopreguntas.presentation.views.AsignarRevisorPanel panel = new co.edu.unicauca.bancopreguntas.presentation.views.AsignarRevisorPanel(asignacionController);
+                    co.edu.unicauca.bancopreguntas.presentation.views.AsignarRevisorPanel panel =
+                        new co.edu.unicauca.bancopreguntas.presentation.views.AsignarRevisorPanel(asignacionController);
                     panel.actualizarDatos();
                     dialog.setContentPane(panel);
                     dialog.pack();
@@ -93,11 +104,19 @@ public class MenuAdministradorFrame extends JFrame {
                     dialog.setVisible(true);
                 } catch (Exception ex) {
                     ex.printStackTrace();
-                    JOptionPane.showMessageDialog(MenuAdministradorFrame.this, "Error al abrir Gestión de Preguntas: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(MenuAdministradorFrame.this,
+                        "Error al abrir Gestión de Preguntas: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                 }
             });
         }
         opcionesPanel.add(btnBancoPreguntas);
+
+        // Botón de historial de notificaciones (HU04)
+        JButton btnNotificaciones = crearBotonMenu("🔔  Notificaciones", notificacionRepository != null);
+        if (notificacionRepository != null) {
+            btnNotificaciones.addActionListener(e -> abrirNotificaciones());
+        }
+        opcionesPanel.add(btnNotificaciones);
 
         JButton btnReportes = crearBotonMenu("📊  Reportes y Estadísticas (próximamente)", false);
         opcionesPanel.add(btnReportes);
@@ -109,7 +128,7 @@ public class MenuAdministradorFrame extends JFrame {
 
         setContentPane(mainPanel);
         pack();
-        setMinimumSize(new Dimension(550, 400));
+        setMinimumSize(new Dimension(550, 450));
         setLocationRelativeTo(null);
     }
 
@@ -118,6 +137,17 @@ public class MenuAdministradorFrame extends JFrame {
         dialog.setContentPane(new GestionUsuariosPanel(usuarioService));
         dialog.pack();
         dialog.setMinimumSize(new Dimension(700, 450));
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    private void abrirNotificaciones() {
+        JDialog dialog = new JDialog(this, "Historial de Notificaciones", true);
+        NotificacionesPanel panel = new NotificacionesPanel(notificacionRepository);
+        panel.cargarDatos();
+        dialog.setContentPane(panel);
+        dialog.pack();
+        dialog.setMinimumSize(new Dimension(750, 400));
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
     }
@@ -133,8 +163,9 @@ public class MenuAdministradorFrame extends JFrame {
 
         if (!habilitado) {
             btn.setEnabled(false);
-            btn.setBackground(new Color(241, 245, 249)); // Gris claro disabled
-            btn.setForeground(new Color(148, 163, 184)); // Texto gris
+            btn.setBackground(new Color(241, 245, 249));  // Gris claro disabled
+            // Fix contraste: color de texto más oscuro para que sea legible (~4.6:1)
+            btn.setForeground(new Color(71, 85, 105));
             btn.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
         }
 

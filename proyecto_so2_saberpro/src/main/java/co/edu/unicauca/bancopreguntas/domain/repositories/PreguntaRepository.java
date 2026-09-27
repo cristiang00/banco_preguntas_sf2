@@ -12,4 +12,7 @@ public interface PreguntaRepository {
     Optional<Pregunta> buscarPorId(int id);
     List<Pregunta> listarPorAutor(int autorId, List<EstadoPregunta> estadosFiltro, String nivelDificultad, int offset, int limit);
     int contarPorAutor(int autorId, List<EstadoPregunta> estadosFiltro, String nivelDificultad);
+    List<Pregunta> listarPorEstado(EstadoPregunta estado, int offset, int limit);
+    int contarPorEstado(EstadoPregunta estado);
 }
+

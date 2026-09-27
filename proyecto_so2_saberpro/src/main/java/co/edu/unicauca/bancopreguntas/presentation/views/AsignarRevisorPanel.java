@@ -122,13 +122,13 @@ public class AsignarRevisorPanel extends JPanel {
             int confirm = JOptionPane.showConfirmDialog(this, "¿Está seguro de asignar los revisores seleccionados a la pregunta " + p.getId() + "?", "Confirmar", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 controller.asignarRevisores(p.getId(), revisorIds);
-                JOptionPane.showMessageDialog(this, "Revisores asignados correctamente. Se ha notificado por correo (simulación).", "Éxito", JOptionPane.INFORMATION_MESSAGE);
-                // Si la pregunta cambia de estado, se debería recargar
-                // En este caso, el backlog no menciona que cambie de estado inmediatamente, pero si lo hiciera:
-                // cargarPreguntas();
+                JOptionPane.showMessageDialog(this, "Revisores asignados correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                // Recargar preguntas (la pregunta puede haber transitado a EN_REVISION)
+                cargarPreguntas();
             }
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 }
+
