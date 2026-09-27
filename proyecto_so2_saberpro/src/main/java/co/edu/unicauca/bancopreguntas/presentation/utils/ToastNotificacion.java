@@ -51,6 +51,7 @@ public class ToastNotificacion {
         int x = bounds.x + bounds.width  - toast.getWidth()  - 20;
         int y = bounds.y + bounds.height - toast.getHeight() - 20;
         toast.setLocation(x, y);
+        toast.setAlwaysOnTop(true);
         toast.setVisible(true);
 
         // Auto-cerrar sin bloquear el EDT

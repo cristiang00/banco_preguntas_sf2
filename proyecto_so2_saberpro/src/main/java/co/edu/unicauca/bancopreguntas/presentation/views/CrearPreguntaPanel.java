@@ -11,7 +11,8 @@ import java.awt.*;
 
 /**
  * Panel para crear una nueva pregunta.
- * Muestra un banner inline verde (éxito) o rojo (error) en lugar de JOptionPane,
+ * Muestra un banner inline verde (éxito) o rojo (error) en lugar de
+ * JOptionPane,
  * siguiendo el estilo del prototipo de interfaz.
  */
 public class CrearPreguntaPanel extends JPanel {
@@ -102,7 +103,7 @@ public class CrearPreguntaPanel extends JPanel {
         y = agregarCampoField(formPanel, gbc, y, "Distractor D: *", txtDistractorD, true);
 
         // Respuesta Correcta *
-        cmbRespuestaCorrecta = new JComboBox<>(new String[]{"", "A", "B", "C", "D"});
+        cmbRespuestaCorrecta = new JComboBox<>(new String[] { "", "A", "B", "C", "D" });
         UIUtils.stylizeTextField(cmbRespuestaCorrecta);
         y = agregarCampoCombo(formPanel, gbc, y, "Respuesta Correcta: *", cmbRespuestaCorrecta, true);
 
@@ -113,25 +114,26 @@ public class CrearPreguntaPanel extends JPanel {
         y = agregarCampoArea(formPanel, gbc, y, "Bibliografía: *", txtBibliografia = new JTextArea(2, 40), true);
 
         // Competencia *
-        cmbCompetencia = new JComboBox<>(new String[]{"", "Lectura Crítica", "Razonamiento Cuantitativo", "Competencias Ciudadanas"});
+        cmbCompetencia = new JComboBox<>(
+                new String[] { "", "Lectura Crítica", "Razonamiento Cuantitativo", "Competencias Ciudadanas" });
         cmbCompetencia.setEditable(true);
         UIUtils.stylizeTextField(cmbCompetencia);
         y = agregarCampoCombo(formPanel, gbc, y, "Competencia: *", cmbCompetencia, true);
 
         // Tema *
-        cmbTema = new JComboBox<>(new String[]{"", "Matemáticas", "Ciencias", "Humanidades"});
+        cmbTema = new JComboBox<>(new String[] { "", "Matemáticas", "Ciencias", "Humanidades" });
         cmbTema.setEditable(true);
         UIUtils.stylizeTextField(cmbTema);
         y = agregarCampoCombo(formPanel, gbc, y, "Tema: *", cmbTema, true);
 
         // Subtema *
-        cmbSubtema = new JComboBox<>(new String[]{"", "Álgebra", "Biología", "Historia"});
+        cmbSubtema = new JComboBox<>(new String[] { "", "Álgebra", "Biología", "Historia" });
         cmbSubtema.setEditable(true);
         UIUtils.stylizeTextField(cmbSubtema);
         y = agregarCampoCombo(formPanel, gbc, y, "Subtema: *", cmbSubtema, true);
 
         // Dificultad *
-        cmbDificultad = new JComboBox<>(new String[]{"", "Bajo", "Medio", "Alto"});
+        cmbDificultad = new JComboBox<>(new String[] { "", "Bajo", "Medio", "Alto" });
         UIUtils.stylizeTextField(cmbDificultad);
         agregarCampoCombo(formPanel, gbc, y, "Dificultad: *", cmbDificultad, true);
 
@@ -160,43 +162,52 @@ public class CrearPreguntaPanel extends JPanel {
     // ── Helpers de layout ─────────────────────────────────────────────────────
 
     private int agregarCampoArea(JPanel panel, GridBagConstraints gbc, int y,
-                                  String labelText, JTextArea area, boolean obligatorio) {
+            String labelText, JTextArea area, boolean obligatorio) {
         UIUtils.stylizeTextField(area);
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
+        gbc.gridx = 0;
+        gbc.gridy = y;
+        gbc.weightx = 0;
         panel.add(crearLabel(labelText, obligatorio), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
         panel.add(new JScrollPane(area), gbc);
         return y + 1;
     }
 
     private int agregarCampoField(JPanel panel, GridBagConstraints gbc, int y,
-                                   String labelText, JTextField field, boolean obligatorio) {
+            String labelText, JTextField field, boolean obligatorio) {
         UIUtils.stylizeTextField(field);
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
+        gbc.gridx = 0;
+        gbc.gridy = y;
+        gbc.weightx = 0;
         panel.add(crearLabel(labelText, obligatorio), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
         panel.add(field, gbc);
         return y + 1;
     }
 
     private int agregarCampoCombo(JPanel panel, GridBagConstraints gbc, int y,
-                                   String labelText, JComboBox<?> combo, boolean obligatorio) {
-        gbc.gridx = 0; gbc.gridy = y; gbc.weightx = 0;
+            String labelText, JComboBox<?> combo, boolean obligatorio) {
+        gbc.gridx = 0;
+        gbc.gridy = y;
+        gbc.weightx = 0;
         panel.add(crearLabel(labelText, obligatorio), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
         panel.add(combo, gbc);
         return y + 1;
     }
 
     /**
-     * Crea un label con texto rojo para obligatorios, gris para opcionales.
+     * Crea un label con texto negro para obligatorios, gris para opcionales.
      */
     private JLabel crearLabel(String texto, boolean obligatorio) {
         JLabel lbl = new JLabel(texto);
         lbl.setFont(UIUtils.FONT_REGULAR);
         lbl.setForeground(obligatorio
-            ? new Color(220, 53, 69)    // rojo: campo obligatorio
-            : new Color(108, 117, 125)); // gris: campo opcional
+                ? UIUtils.COLOR_TEXT_PRIMARY // negro: campo obligatorio
+                : new Color(108, 117, 125)); // gris: campo opcional
         return lbl;
     }
 
@@ -206,27 +217,30 @@ public class CrearPreguntaPanel extends JPanel {
         ocultarBanner();
 
         Pregunta p = new PreguntaBuilder()
-            .conContexto(txtContexto.getText())
-            .conPreguntaDirecta(txtPreguntaDirecta.getText())
-            .conDistractor1(txtDistractorA.getText())
-            .conDistractor2(txtDistractorB.getText())
-            .conDistractor3(txtDistractorC.getText())
-            .conDistractor4(txtDistractorD.getText())
-            .conRespuestaCorrecta((String) cmbRespuestaCorrecta.getSelectedItem())
-            .conJustificacion(txtJustificacion.getText())
-            .conBibliografia(txtBibliografia.getText())
-            .conCompetencia(cmbCompetencia.getSelectedItem() != null
-                ? cmbCompetencia.getSelectedItem().toString() : "")
-            .conTema(cmbTema.getSelectedItem() != null
-                ? cmbTema.getSelectedItem().toString() : "")
-            .conSubtema(cmbSubtema.getSelectedItem() != null
-                ? cmbSubtema.getSelectedItem().toString() : "")
-            .conNivelDificultad((String) cmbDificultad.getSelectedItem())
-            .build();
+                .conContexto(txtContexto.getText())
+                .conPreguntaDirecta(txtPreguntaDirecta.getText())
+                .conDistractor1(txtDistractorA.getText())
+                .conDistractor2(txtDistractorB.getText())
+                .conDistractor3(txtDistractorC.getText())
+                .conDistractor4(txtDistractorD.getText())
+                .conRespuestaCorrecta((String) cmbRespuestaCorrecta.getSelectedItem())
+                .conJustificacion(txtJustificacion.getText())
+                .conBibliografia(txtBibliografia.getText())
+                .conCompetencia(cmbCompetencia.getSelectedItem() != null
+                        ? cmbCompetencia.getSelectedItem().toString()
+                        : "")
+                .conTema(cmbTema.getSelectedItem() != null
+                        ? cmbTema.getSelectedItem().toString()
+                        : "")
+                .conSubtema(cmbSubtema.getSelectedItem() != null
+                        ? cmbSubtema.getSelectedItem().toString()
+                        : "")
+                .conNivelDificultad((String) cmbDificultad.getSelectedItem())
+                .build();
 
         try {
             preguntaController.crearPregunta(p);
-            mostrarBannerExito("✓  Pregunta guardada correctamente en estado \"En borrador\"");
+            mostrarBannerExito(" Pregunta guardada correctamente en estado \"En borrador\"");
             limpiarCampos();
         } catch (IllegalArgumentException ex) {
             mostrarBannerError("✕  " + ex.getMessage());
@@ -235,11 +249,11 @@ public class CrearPreguntaPanel extends JPanel {
 
     private void mostrarBannerExito(String mensaje) {
         bannerLabel.setText(mensaje);
-        bannerLabel.setForeground(new Color(21, 87, 36));      // verde oscuro
-        bannerPanel.setBackground(new Color(212, 237, 218));   // verde claro
+        bannerLabel.setForeground(new Color(21, 87, 36)); // verde oscuro
+        bannerPanel.setBackground(new Color(212, 237, 218)); // verde claro
         bannerPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(195, 230, 203), 1, true),
-            new EmptyBorder(8, 14, 8, 14)));
+                BorderFactory.createLineBorder(new Color(195, 230, 203), 1, true),
+                new EmptyBorder(8, 14, 8, 14)));
         bannerPanel.setVisible(true);
         revalidate();
         repaint();
@@ -251,11 +265,11 @@ public class CrearPreguntaPanel extends JPanel {
 
     private void mostrarBannerError(String mensaje) {
         bannerLabel.setText(mensaje);
-        bannerLabel.setForeground(new Color(114, 28, 36));     // rojo oscuro
-        bannerPanel.setBackground(new Color(248, 215, 218));   // rojo claro
+        bannerLabel.setForeground(new Color(114, 28, 36)); // rojo oscuro
+        bannerPanel.setBackground(new Color(248, 215, 218)); // rojo claro
         bannerPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(245, 198, 203), 1, true),
-            new EmptyBorder(8, 14, 8, 14)));
+                BorderFactory.createLineBorder(new Color(245, 198, 203), 1, true),
+                new EmptyBorder(8, 14, 8, 14)));
         bannerPanel.setVisible(true);
         revalidate();
         repaint();

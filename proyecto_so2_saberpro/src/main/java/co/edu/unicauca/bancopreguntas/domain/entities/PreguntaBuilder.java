@@ -6,17 +6,10 @@ import java.time.LocalDateTime;
  * Builder para {@link Pregunta} — patrón GoF Creacional.
  * <p>
  * Responsabilidad: construir objetos {@code Pregunta} con una API fluida.
- * Las <strong>validaciones de negocio</strong> siguen siendo responsabilidad exclusiva de
- * {@code PreguntaService.validarCampos()} (SRP); el Builder solo crea el objeto.
- * </p>
- *
- * <pre>
- * Pregunta p = new PreguntaBuilder()
- *     .conContexto("...")
- *     .conPreguntaDirecta("...")
- *     ...
- *     .build();
- * </pre>
+ * Las <strong>validaciones de negocio</strong> siguen siendo responsabilidad
+ * exclusiva de
+ * {@code PreguntaService.validarCampos()} (SRP); el Builder solo crea el
+ * objeto.
  */
 public class PreguntaBuilder {
 
@@ -113,7 +106,8 @@ public class PreguntaBuilder {
 
     /**
      * Construye la instancia de {@link Pregunta}. El estado inicial siempre es
-     * {@link EstadoPregunta#BORRADOR} y la fecha de creación se fija en el momento del build.
+     * {@link EstadoPregunta#BORRADOR} y la fecha de creación se fija en el momento
+     * del build.
      *
      * @return una nueva instancia de {@code Pregunta}
      */
@@ -134,8 +128,8 @@ public class PreguntaBuilder {
         p.setNivelDificultad(nivelDificultad);
         p.setAutorId(autorId);
         p.setAutorNombre(autorNombre);
-        p.setEstado(EstadoPregunta.BORRADOR);      // estado inicial fijo
-        p.setFechaCreacion(LocalDateTime.now());   // timestamp del momento del build
+        p.setEstado(EstadoPregunta.BORRADOR); // estado inicial fijo
+        p.setFechaCreacion(LocalDateTime.now()); // timestamp del momento del build
         return p;
     }
 }

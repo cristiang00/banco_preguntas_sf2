@@ -7,6 +7,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
+import co.edu.unicauca.bancopreguntas.domain.repositories.NotificacionRepository;
 import co.edu.unicauca.bancopreguntas.presentation.utils.UIUtils;
 
 /**
@@ -25,6 +26,7 @@ public class MenuGenericoFrame extends JFrame {
 
         MENU_OPTIONS.put(Rol.REVISOR, Arrays.asList(
                 "🔍  Revisar Preguntas Pendientes",
+                "🔔  Mis Notificaciones",
                 "✅  Preguntas Aprobadas",
                 "❌  Preguntas Rechazadas",
                 "📊  Estadísticas de Revisión"
@@ -48,18 +50,36 @@ public class MenuGenericoFrame extends JFrame {
     private final Usuario usuario;
     private final LoginFrame loginFrame;
     private final co.edu.unicauca.bancopreguntas.presentation.controllers.PreguntaController preguntaController;
+    private final NotificacionRepository notificacionRepository;
 
     /**
      * Constructor del menú genérico.
      *
      * @param usuario usuario autenticado
      * @param loginFrame ventana de inicio de sesión
+     * @param preguntaController controlador de preguntas (puede ser null si el rol no lo usa)
+     * @param notificacionRepository repositorio de notificaciones (puede ser null si el rol no lo usa)
      */
-    public MenuGenericoFrame(Usuario usuario, LoginFrame loginFrame, co.edu.unicauca.bancopreguntas.presentation.controllers.PreguntaController preguntaController) {
+    public MenuGenericoFrame(Usuario usuario, LoginFrame loginFrame,
+                             co.edu.unicauca.bancopreguntas.presentation.controllers.PreguntaController preguntaController,
+                             NotificacionRepository notificacionRepository) {
         this.usuario = usuario;
         this.loginFrame = loginFrame;
         this.preguntaController = preguntaController;
+        this.notificacionRepository = notificacionRepository;
         inicializarUI();
+    }
+
+    /**
+     * Constructor original para compatibilidad (sin notificaciones).
+     *
+     * @param usuario usuario autenticado
+     * @param loginFrame ventana de inicio de sesión
+     * @param preguntaController controlador de preguntas
+     */
+    public MenuGenericoFrame(Usuario usuario, LoginFrame loginFrame,
+                             co.edu.unicauca.bancopreguntas.presentation.controllers.PreguntaController preguntaController) {
+        this(usuario, loginFrame, preguntaController, null);
     }
 
     private void inicializarUI() {
@@ -131,6 +151,29 @@ public class MenuGenericoFrame extends JFrame {
                         dialog.setContentPane(panel);
                         dialog.pack();
                         dialog.setMinimumSize(new Dimension(800, 500));
+                        dialog.setLocationRelativeTo(MenuGenericoFrame.this);
+                        dialog.setVisible(true);
+                    });
+                    opcionesPanel.add(btn);
+                } else {
+                    opcionesPanel.add(crearBotonMenuPlaceholder(opcion + " (próximamente)"));
+                }
+            }
+        } else if (usuario.getRol() == Rol.REVISOR && notificacionRepository != null) {
+            // Para el REVISOR, habilitar solo "Mis Notificaciones"
+            for (String opcion : opciones) {
+                if (opcion.equals("🔔  Mis Notificaciones")) {
+                    JButton btn = new JButton(opcion);
+                    UIUtils.stylizeSidebarButton(btn);
+                    btn.addActionListener(e -> {
+                        JDialog dialog = new JDialog(MenuGenericoFrame.this, "Mis Notificaciones", true);
+                        co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel panel =
+                                new co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel(
+                                        notificacionRepository, usuario.getId());
+                        panel.cargarDatos();
+                        dialog.setContentPane(panel);
+                        dialog.pack();
+                        dialog.setMinimumSize(new Dimension(700, 450));
                         dialog.setLocationRelativeTo(MenuGenericoFrame.this);
                         dialog.setVisible(true);
                     });

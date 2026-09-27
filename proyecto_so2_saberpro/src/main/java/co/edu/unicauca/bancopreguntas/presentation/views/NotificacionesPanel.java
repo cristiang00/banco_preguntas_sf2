@@ -13,16 +13,34 @@ import java.util.List;
  * Panel que muestra el historial de notificaciones de asignación de revisores.
  * <p>
  * Los datos se obtienen de {@link NotificacionRepository} (SQLite), así el historial
- * persiste entre sesiones. Se puede acceder desde el menú del Administrador.
+ * persiste entre sesiones. Se puede acceder desde el menú del Administrador
+ * (todas las notificaciones) o desde el menú del Revisor (filtrado por revisorId).
  * </p>
  */
 public class NotificacionesPanel extends JPanel {
 
     private final NotificacionRepository notificacionRepository;
+    private final Integer revisorIdFiltro;
     private DefaultTableModel modelo;
 
+    /**
+     * Constructor para el Administrador: muestra todas las notificaciones.
+     *
+     * @param notificacionRepository repositorio de notificaciones
+     */
     public NotificacionesPanel(NotificacionRepository notificacionRepository) {
+        this(notificacionRepository, null);
+    }
+
+    /**
+     * Constructor con filtro opcional por revisor.
+     *
+     * @param notificacionRepository repositorio de notificaciones
+     * @param revisorId si no es null, filtra las notificaciones por este revisor
+     */
+    public NotificacionesPanel(NotificacionRepository notificacionRepository, Integer revisorId) {
         this.notificacionRepository = notificacionRepository;
+        this.revisorIdFiltro = revisorId;
         inicializarUI();
     }
 
@@ -32,7 +50,10 @@ public class NotificacionesPanel extends JPanel {
         setBackground(UIUtils.COLOR_BACKGROUND);
 
         // Título
-        JLabel titulo = new JLabel("Historial de Notificaciones", SwingConstants.CENTER);
+        String tituloTexto = revisorIdFiltro != null
+                ? "Mis Notificaciones"
+                : "Historial de Notificaciones";
+        JLabel titulo = new JLabel(tituloTexto, SwingConstants.CENTER);
         titulo.setFont(UIUtils.FONT_TITLE);
         titulo.setForeground(UIUtils.COLOR_TEXT_PRIMARY);
         add(titulo, BorderLayout.NORTH);
@@ -72,7 +93,9 @@ public class NotificacionesPanel extends JPanel {
      */
     public void cargarDatos() {
         modelo.setRowCount(0);
-        List<Notificacion> notificaciones = notificacionRepository.listarTodas();
+        List<Notificacion> notificaciones = revisorIdFiltro != null
+                ? notificacionRepository.listarPorRevisor(revisorIdFiltro)
+                : notificacionRepository.listarTodas();
         for (Notificacion n : notificaciones) {
             modelo.addRow(new Object[]{
                 n.getFecha().toString().replace("T", " ").substring(0, 19),

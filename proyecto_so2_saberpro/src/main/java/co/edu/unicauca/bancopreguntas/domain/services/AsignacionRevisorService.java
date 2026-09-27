@@ -31,27 +31,24 @@ public class AsignacionRevisorService {
      * Inicia con lista vacía de observadores.
      */
     public AsignacionRevisorService(AsignacionRevisorRepository asignacionRepository,
-                                     PreguntaRepository preguntaRepository,
-                                     UsuarioRepository usuarioRepository) {
+            PreguntaRepository preguntaRepository,
+            UsuarioRepository usuarioRepository) {
         this(asignacionRepository, preguntaRepository, usuarioRepository, new ArrayList<>());
     }
 
     /**
-     * Constructor con lista inicial de observadores (para inyección por constructor).
+     * Constructor con lista inicial de observadores (para inyección por
+     * constructor).
      */
     public AsignacionRevisorService(AsignacionRevisorRepository asignacionRepository,
-                                     PreguntaRepository preguntaRepository,
-                                     UsuarioRepository usuarioRepository,
-                                     List<NotificadorAsignacion> observadores) {
+            PreguntaRepository preguntaRepository,
+            UsuarioRepository usuarioRepository,
+            List<NotificadorAsignacion> observadores) {
         this.asignacionRepository = asignacionRepository;
         this.preguntaRepository = preguntaRepository;
         this.usuarioRepository = usuarioRepository;
         this.observadores = new ArrayList<>(observadores);
     }
-
-    // -------------------------------------------------------------------------
-    // API de observadores (patrón Observer)
-    // -------------------------------------------------------------------------
 
     public void agregarObservador(NotificadorAsignacion observador) {
         observadores.add(observador);
@@ -60,10 +57,6 @@ public class AsignacionRevisorService {
     public void removerObservador(NotificadorAsignacion observador) {
         observadores.remove(observador);
     }
-
-    // -------------------------------------------------------------------------
-    // Lógica de negocio
-    // -------------------------------------------------------------------------
 
     public void asignarRevisores(int preguntaId, List<Integer> revisorIds) {
         Optional<Pregunta> opt = preguntaRepository.buscarPorId(preguntaId);
@@ -74,20 +67,22 @@ public class AsignacionRevisorService {
         Pregunta pregunta = opt.get();
         if (pregunta.getEstado() != EstadoPregunta.PENDIENTE_REVISION) {
             throw new IllegalArgumentException(
-                "Solo las preguntas en estado Pendiente de revisión pueden tener revisores asignados");
+                    "Solo las preguntas en estado Pendiente de revisión pueden tener revisores asignados");
         }
 
         if (revisorIds == null || revisorIds.isEmpty()) {
             throw new IllegalArgumentException("Debe seleccionar al menos un revisor");
         }
 
-        // Validar que todos los IDs corresponden a usuarios con rol REVISOR antes de asignar
+        // Validar que todos los IDs corresponden a usuarios con rol REVISOR antes de
+        // asignar
         List<Usuario> revisoresValidados = new ArrayList<>();
         for (Integer revisorId : revisorIds) {
             Usuario revisor = resolverRevisor(revisorId);
             if (revisor.getRol() != Rol.REVISOR) {
                 throw new IllegalArgumentException(
-                    "El usuario " + revisor.getNombreUsuario() + " no puede ser asignado porque no tiene rol de Revisor");
+                        "El usuario " + revisor.getNombreUsuario()
+                                + " no puede ser asignado porque no tiene rol de Revisor");
             }
             revisoresValidados.add(revisor);
         }
@@ -105,21 +100,17 @@ public class AsignacionRevisorService {
             }
         }
 
-        // HU04: transicionar a EN_REVISION tras la primera asignación exitosa
+        // transicionar a EN_REVISION tras la primera asignación exitosa
         if (primerAsignado && pregunta.getEstado() == EstadoPregunta.PENDIENTE_REVISION) {
             preguntaRepository.actualizarEstado(preguntaId, EstadoPregunta.EN_REVISION);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Métodos auxiliares privados
-    // -------------------------------------------------------------------------
-
     private Usuario resolverRevisor(int revisorId) {
         return usuarioRepository.listarTodos().stream()
-            .filter(u -> u.getId() == revisorId)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException(
-                "El usuario con ID " + revisorId + " no existe"));
+                .filter(u -> u.getId() == revisorId)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El usuario con ID " + revisorId + " no existe"));
     }
 }

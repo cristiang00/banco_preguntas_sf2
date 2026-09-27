@@ -20,4 +20,12 @@ public interface NotificacionRepository {
      * @return lista de notificaciones
      */
     List<Notificacion> listarTodas();
+
+    /**
+     * Retorna las notificaciones de un revisor específico, ordenadas por fecha descendente.
+     *
+     * @param revisorId identificador del revisor
+     * @return lista de notificaciones del revisor
+     */
+    List<Notificacion> listarPorRevisor(int revisorId);
 }

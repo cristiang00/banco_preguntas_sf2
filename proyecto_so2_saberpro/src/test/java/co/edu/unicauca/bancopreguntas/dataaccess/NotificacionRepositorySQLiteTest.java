@@ -97,4 +97,43 @@ class NotificacionRepositorySQLiteTest {
         repo.guardar(n);
         assertTrue(n.getId() > 0, "El ID debe ser asignado por AUTOINCREMENT");
     }
+
+    @Test
+    void listarPorRevisor_filtraCorrectamente() {
+        LocalDateTime base = LocalDateTime.of(2026, 9, 1, 10, 0, 0);
+
+        Notificacion n1 = new Notificacion();
+        n1.setPreguntaId(1); n1.setRevisorId(10);
+        n1.setRevisorNombre("Revisor Uno");
+        n1.setAsunto("Para revisor 10"); n1.setFecha(base);
+        repo.guardar(n1);
+
+        Notificacion n2 = new Notificacion();
+        n2.setPreguntaId(2); n2.setRevisorId(20);
+        n2.setRevisorNombre("Revisor Dos");
+        n2.setAsunto("Para revisor 20"); n2.setFecha(base.plusHours(1));
+        repo.guardar(n2);
+
+        Notificacion n3 = new Notificacion();
+        n3.setPreguntaId(3); n3.setRevisorId(10);
+        n3.setRevisorNombre("Revisor Uno");
+        n3.setAsunto("Otra para revisor 10"); n3.setFecha(base.plusHours(2));
+        repo.guardar(n3);
+
+        List<Notificacion> delRevisor10 = repo.listarPorRevisor(10);
+        assertEquals(2, delRevisor10.size());
+        // Verificar orden descendente por fecha
+        assertEquals("Otra para revisor 10", delRevisor10.get(0).getAsunto());
+        assertEquals("Para revisor 10", delRevisor10.get(1).getAsunto());
+
+        List<Notificacion> delRevisor20 = repo.listarPorRevisor(20);
+        assertEquals(1, delRevisor20.size());
+        assertEquals("Para revisor 20", delRevisor20.get(0).getAsunto());
+    }
+
+    @Test
+    void listarPorRevisor_sinDatos_retornaListaVacia() {
+        List<Notificacion> lista = repo.listarPorRevisor(999);
+        assertTrue(lista.isEmpty());
+    }
 }

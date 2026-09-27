@@ -98,7 +98,7 @@ public class Main {
                     frame.setVisible(true);
                 } else {
                     PreguntaController preguntaController = new PreguntaController(preguntaService, usuario.getId());
-                    new MenuGenericoFrame(usuario, loginFrameWrapper[0], preguntaController).setVisible(true);
+                    new MenuGenericoFrame(usuario, loginFrameWrapper[0], preguntaController, notificacionRepository).setVisible(true);
                 }
             };
 

@@ -89,4 +89,31 @@ public class NotificacionRepositorySQLite implements NotificacionRepository {
         }
         return lista;
     }
+
+    @Override
+    public List<Notificacion> listarPorRevisor(int revisorId) {
+        String sql = "SELECT * FROM notificaciones WHERE revisor_id = ? ORDER BY fecha DESC";
+        List<Notificacion> lista = new ArrayList<>();
+        try (Connection conn = conexion.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, revisorId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Notificacion n = new Notificacion();
+                    n.setId(rs.getInt("id"));
+                    n.setPreguntaId(rs.getInt("pregunta_id"));
+                    n.setRevisorId(rs.getInt("revisor_id"));
+                    n.setRevisorNombre(rs.getString("revisor_nombre"));
+                    n.setAsunto(rs.getString("asunto"));
+                    n.setCuerpo(rs.getString("cuerpo"));
+                    n.setPreguntaResumen(rs.getString("pregunta_resumen"));
+                    n.setFecha(LocalDateTime.parse(rs.getString("fecha"), FORMATTER));
+                    lista.add(n);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error al listar notificaciones por revisor: " + e.getMessage(), e);
+        }
+        return lista;
+    }
 }

@@ -67,11 +67,15 @@ public class UIUtils {
         button.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                button.setBackground(new Color(30, 41, 59));
+                if (button.isEnabled()) {
+                    button.setBackground(new Color(30, 41, 59));
+                }
             }
             @Override
             public void mouseExited(MouseEvent e) {
-                button.setBackground(COLOR_TEXT_PRIMARY);
+                if (button.isEnabled()) {
+                    button.setBackground(COLOR_TEXT_PRIMARY);
+                }
             }
         });
     }
