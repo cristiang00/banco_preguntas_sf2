@@ -10,8 +10,10 @@ public class Notificacion {
     private int id;
     private int preguntaId;
     private int revisorId;
+    private String revisorNombre;
     private String asunto;
     private String cuerpo;
+    private String preguntaResumen;
     private LocalDateTime fecha;
 
     public Notificacion() {
@@ -31,6 +33,12 @@ public class Notificacion {
 
     public String getCuerpo() { return cuerpo; }
     public void setCuerpo(String cuerpo) { this.cuerpo = cuerpo; }
+
+    public String getRevisorNombre() { return revisorNombre; }
+    public void setRevisorNombre(String revisorNombre) { this.revisorNombre = revisorNombre; }
+
+    public String getPreguntaResumen() { return preguntaResumen; }
+    public void setPreguntaResumen(String preguntaResumen) { this.preguntaResumen = preguntaResumen; }
 
     public LocalDateTime getFecha() { return fecha; }
     public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }

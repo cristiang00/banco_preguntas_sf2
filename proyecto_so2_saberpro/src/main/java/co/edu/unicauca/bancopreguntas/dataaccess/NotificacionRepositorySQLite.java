@@ -26,12 +26,14 @@ public class NotificacionRepositorySQLite implements NotificacionRepository {
 
     private void crearTablaSimNecesaria() {
         String sql = "CREATE TABLE IF NOT EXISTS notificaciones ("
-                   + "    id          INTEGER PRIMARY KEY AUTOINCREMENT,"
-                   + "    pregunta_id INTEGER NOT NULL,"
-                   + "    revisor_id  INTEGER NOT NULL,"
-                   + "    asunto      TEXT NOT NULL,"
-                   + "    cuerpo      TEXT,"
-                   + "    fecha       TEXT NOT NULL"
+                   + "    id              INTEGER PRIMARY KEY AUTOINCREMENT,"
+                   + "    pregunta_id     INTEGER NOT NULL,"
+                   + "    revisor_id      INTEGER NOT NULL,"
+                   + "    revisor_nombre  TEXT,"
+                   + "    asunto          TEXT NOT NULL,"
+                   + "    cuerpo          TEXT,"
+                   + "    pregunta_resumen TEXT,"
+                   + "    fecha           TEXT NOT NULL"
                    + ")";
         try (Connection conn = conexion.getConnection();
              Statement stmt = conn.createStatement()) {
@@ -43,15 +45,17 @@ public class NotificacionRepositorySQLite implements NotificacionRepository {
 
     @Override
     public void guardar(Notificacion notificacion) {
-        String sql = "INSERT INTO notificaciones (pregunta_id, revisor_id, asunto, cuerpo, fecha) "
-                   + "VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO notificaciones (pregunta_id, revisor_id, revisor_nombre, asunto, cuerpo, pregunta_resumen, fecha) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = conexion.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, notificacion.getPreguntaId());
             ps.setInt(2, notificacion.getRevisorId());
-            ps.setString(3, notificacion.getAsunto());
-            ps.setString(4, notificacion.getCuerpo());
-            ps.setString(5, notificacion.getFecha().format(FORMATTER));
+            ps.setString(3, notificacion.getRevisorNombre());
+            ps.setString(4, notificacion.getAsunto());
+            ps.setString(5, notificacion.getCuerpo());
+            ps.setString(6, notificacion.getPreguntaResumen());
+            ps.setString(7, notificacion.getFecha().format(FORMATTER));
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) notificacion.setId(rs.getInt(1));
@@ -73,8 +77,10 @@ public class NotificacionRepositorySQLite implements NotificacionRepository {
                 n.setId(rs.getInt("id"));
                 n.setPreguntaId(rs.getInt("pregunta_id"));
                 n.setRevisorId(rs.getInt("revisor_id"));
+                n.setRevisorNombre(rs.getString("revisor_nombre"));
                 n.setAsunto(rs.getString("asunto"));
                 n.setCuerpo(rs.getString("cuerpo"));
+                n.setPreguntaResumen(rs.getString("pregunta_resumen"));
                 n.setFecha(LocalDateTime.parse(rs.getString("fecha"), FORMATTER));
                 lista.add(n);
             }

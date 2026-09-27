@@ -77,6 +77,7 @@ public class Main {
 
             // 6. Configurar el callback de Login para crear los Controladores y abrir el Menú correcto
             LoginFrame[] loginFrameWrapper = new LoginFrame[1];
+            ToastNotificadorAsignacion[] currentToastObserver = new ToastNotificadorAsignacion[1];
 
             Consumer<Usuario> onLoginSuccess = (Usuario usuario) -> {
                 if (usuario.getRol() == Rol.ADMINISTRADOR) {
@@ -88,7 +89,11 @@ public class Main {
                         asignacionController, notificacionRepository);
 
                     // Observer 2: toast en la UI — se registra cuando ya existe la ventana padre
-                    asignacionService.agregarObservador(new ToastNotificadorAsignacion(frame));
+                    if (currentToastObserver[0] != null) {
+                        asignacionService.removerObservador(currentToastObserver[0]);
+                    }
+                    currentToastObserver[0] = new ToastNotificadorAsignacion(frame);
+                    asignacionService.agregarObservador(currentToastObserver[0]);
 
                     frame.setVisible(true);
                 } else {

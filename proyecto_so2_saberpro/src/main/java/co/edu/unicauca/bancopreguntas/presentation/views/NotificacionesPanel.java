@@ -39,7 +39,7 @@ public class NotificacionesPanel extends JPanel {
 
         // Tabla
         modelo = new DefaultTableModel(
-                new Object[]{"Fecha", "Revisor ID", "Asunto", "Pregunta ID"}, 0) {
+                new Object[]{"Fecha", "Revisor", "Asunto", "Pregunta"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -76,9 +76,9 @@ public class NotificacionesPanel extends JPanel {
         for (Notificacion n : notificaciones) {
             modelo.addRow(new Object[]{
                 n.getFecha().toString().replace("T", " ").substring(0, 19),
-                n.getRevisorId(),
+                n.getRevisorNombre() != null ? n.getRevisorNombre() : String.valueOf(n.getRevisorId()),
                 n.getAsunto(),
-                n.getPreguntaId()
+                n.getPreguntaResumen() != null ? n.getPreguntaResumen() : String.valueOf(n.getPreguntaId())
             });
         }
         if (notificaciones.isEmpty()) {

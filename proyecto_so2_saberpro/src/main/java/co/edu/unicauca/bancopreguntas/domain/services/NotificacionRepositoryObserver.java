@@ -24,10 +24,16 @@ public class NotificacionRepositoryObserver implements NotificadorAsignacion {
         Notificacion n = new Notificacion();
         n.setPreguntaId(pregunta.getId());
         n.setRevisorId(revisor.getId());
+        n.setRevisorNombre(revisor.getNombreCompleto());
         n.setAsunto("Revisión asignada: Pregunta #" + pregunta.getId());
         n.setCuerpo("Estimado " + revisor.getNombreCompleto()
                 + ", se le ha asignado la revisión de la siguiente pregunta: "
                 + pregunta.getPreguntaDirecta());
+                
+        String pDirecta = pregunta.getPreguntaDirecta();
+        n.setPreguntaResumen(pDirecta != null && pDirecta.length() > 50 
+                ? pDirecta.substring(0, 47) + "..." : pDirecta);
+
         n.setFecha(LocalDateTime.now());
         notificacionRepository.guardar(n);
     }

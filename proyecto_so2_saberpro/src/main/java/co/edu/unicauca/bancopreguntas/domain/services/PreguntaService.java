@@ -45,21 +45,7 @@ public class PreguntaService {
     }
 
     public void enviarARevision(int preguntaId, int autorId) {
-        Optional<Pregunta> opt = preguntaRepository.buscarPorId(preguntaId);
-        if (opt.isEmpty()) {
-            throw new IllegalArgumentException("La pregunta no existe");
-        }
-        Pregunta pregunta = opt.get();
-
-        if (pregunta.getAutorId() != autorId) {
-            throw new IllegalArgumentException("No tiene permisos para modificar el estado de esta pregunta");
-        }
-
-        if (pregunta.getEstado() != EstadoPregunta.BORRADOR) {
-            throw new IllegalArgumentException("Solo las preguntas en estado Borrador pueden enviarse a revisión");
-        }
-
-        preguntaRepository.actualizarEstado(preguntaId, EstadoPregunta.PENDIENTE_REVISION);
+        new EnviarARevisionTransicion(preguntaRepository).ejecutar(preguntaId, autorId);
     }
 
     public List<Pregunta> listarMisPreguntas(int autorId, List<EstadoPregunta> estadosFiltro, String nivelDificultad, int offset, int limit) {
