@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "co.edu.unicauca.bancopreguntas.Main",
+            "projectName": ""
+        },
+        {
+            "type": "java",
+            "name": "Saber Pro - Main",
+            "request": "launch",
+            "mainClass": "co.edu.unicauca.bancopreguntas.Main",
+            "projectName": "bancopreguntas-saberpro",
+            "cwd": "${workspaceFolder}/proyecto_so2_saberpro"
+        }
+    ]
+}
