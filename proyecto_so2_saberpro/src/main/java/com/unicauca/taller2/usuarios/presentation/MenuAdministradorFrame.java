@@ -2,7 +2,6 @@ package com.unicauca.taller2.usuarios.presentation;
 
 import co.edu.unicauca.bancopreguntas.domain.repositories.NotificacionRepository;
 import co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel;
-import co.edu.unicauca.bancopreguntas.presentation.views.ToastNotificadorAsignacion;
 import com.unicauca.taller2.usuarios.services.UsuarioService;
 import com.unicauca.taller2.usuarios.model.Usuario;
 

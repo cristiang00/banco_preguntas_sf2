@@ -1,10 +1,8 @@
 package co.edu.unicauca.bancopreguntas.domain.services;
-
-import co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta;
 import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
 import co.edu.unicauca.bancopreguntas.domain.repositories.PreguntaRepository;
 
-import java.util.Optional;
+
 
 public abstract class TransicionEstadoPreguntaTemplate {
 
@@ -14,14 +12,6 @@ public abstract class TransicionEstadoPreguntaTemplate {
         this.preguntaRepository = preguntaRepository;
     }
 
-    /**
-     * Ejecuta la transición de estado. Método <em>final</em> — no puede
-     * sobreescribirse.
-     * Sigue el orden: buscar → validar → ejecutar → persistir.
-     *
-     * @param preguntaId el ID de la pregunta a transicionar
-     * @param usuarioId  el ID del usuario que ejecuta la acción
-     */
     public final void ejecutar(int preguntaId, int usuarioId) {
         Pregunta pregunta = buscarPregunta(preguntaId);
         validarPrecondiciones(pregunta, usuarioId);
@@ -29,38 +19,18 @@ public abstract class TransicionEstadoPreguntaTemplate {
         persistir(pregunta);
     }
 
-    /**
-     * Paso invariante: busca la pregunta o lanza excepción si no existe.
-     */
+  
     private Pregunta buscarPregunta(int id) {
         return preguntaRepository.buscarPorId(id)
                 .orElseThrow(() -> new IllegalArgumentException("La pregunta no existe"));
     }
 
-    /**
-     * Paso variable — valida que la transición es permitida para este usuario y
-     * estado actual.
-     *
-     * @param pregunta  la pregunta a transicionar
-     * @param usuarioId el usuario que ejecuta la acción
-     * @throws IllegalArgumentException si las precondiciones no se cumplen
-     */
+  
     protected abstract void validarPrecondiciones(Pregunta pregunta, int usuarioId);
-
-    /**
-     * Paso variable — aplica el cambio de estado a la entidad en memoria.
-     *
-     * @param pregunta  la pregunta a transicionar
-     * @param usuarioId el usuario que ejecuta la acción
-     */
+  
     protected abstract void ejecutarTransicion(Pregunta pregunta, int usuarioId);
 
-    /**
-     * Paso invariante por defecto — persiste el nuevo estado de la pregunta.
-     * Puede sobreescribirse si la transición requiere lógica adicional.
-     *
-     * @param pregunta la pregunta con el estado ya actualizado en memoria
-     */
+    
     protected void persistir(Pregunta pregunta) {
         preguntaRepository.actualizarEstado(pregunta.getId(), pregunta.getEstado());
     }

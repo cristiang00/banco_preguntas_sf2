@@ -1,6 +1,5 @@
 package co.edu.unicauca.bancopreguntas.domain.services;
 
-import co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta;
 import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
 import co.edu.unicauca.bancopreguntas.domain.repositories.PreguntaRepository;
 
@@ -24,7 +23,7 @@ public class EnviarARevisionTransicion extends TransicionEstadoPreguntaTemplate 
             throw new IllegalArgumentException(
                     "No tiene permisos para modificar el estado de esta pregunta");
         }
-        if (pregunta.getEstado() != EstadoPregunta.BORRADOR) {
+        if (!(pregunta.getState() instanceof co.edu.unicauca.bancopreguntas.domain.state.DraftState)) {
             throw new IllegalArgumentException(
                     "Solo las preguntas en estado Borrador pueden enviarse a revisión");
         }
@@ -32,6 +31,6 @@ public class EnviarARevisionTransicion extends TransicionEstadoPreguntaTemplate 
 
     @Override
     protected void ejecutarTransicion(Pregunta pregunta, int usuarioId) {
-        pregunta.setEstado(EstadoPregunta.PENDIENTE_REVISION);
+        pregunta.submitForReview();
     }
 }

@@ -6,7 +6,7 @@
             "name": "Main",
             "request": "launch",
             "mainClass": "co.edu.unicauca.bancopreguntas.Main",
-            "projectName": ""
+            "projectName": "bancopreguntas-saberpro"
         },
         {
             "type": "java",

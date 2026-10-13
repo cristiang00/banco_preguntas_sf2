@@ -1,26 +1,31 @@
 package co.edu.unicauca.bancopreguntas.presentation.views;
 
+import co.edu.unicauca.bancopreguntas.domain.decorator.DecoratedQuestionView;
+import co.edu.unicauca.bancopreguntas.domain.decorator.QuestionDecoratorFactory;
+import co.edu.unicauca.bancopreguntas.domain.entities.OpcionRespuesta;
 import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
-import java.awt.BorderLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-import javax.swing.BorderFactory;
-import javax.swing.JDialog;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
+import co.edu.unicauca.bancopreguntas.presentation.controllers.PreguntaController;
 import co.edu.unicauca.bancopreguntas.presentation.utils.UIUtils;
 
+import javax.swing.*;
+import java.awt.*;
+
 public class DetallePreguntaDialog extends JDialog {
+
+    private final PreguntaController preguntaController;
+
     public DetallePreguntaDialog(java.awt.Window parent, Pregunta pregunta) {
+        this(parent, pregunta, null);
+    }
+
+    public DetallePreguntaDialog(java.awt.Window parent, Pregunta pregunta, PreguntaController preguntaController) {
         super(parent, "Detalle de la Pregunta", java.awt.Dialog.ModalityType.APPLICATION_MODAL);
+        this.preguntaController = preguntaController;
         inicializarUI(pregunta);
     }
 
     private void inicializarUI(Pregunta pregunta) {
-        setSize(500, 600);
+        setSize(580, 680);
         setLocationRelativeTo(getParent());
 
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
@@ -38,13 +43,31 @@ public class DetallePreguntaDialog extends JDialog {
         gbc.anchor = GridBagConstraints.WEST;
 
         int y = 0;
+        String tipoStr = pregunta.getTipo() != null ? pregunta.getTipo().getNombre() : "Selección Única";
+        addCampoTexto(infoPanel, gbc, "Tipo de Pregunta:", tipoStr, y++);
         addCampoTexto(infoPanel, gbc, "Contexto:", pregunta.getContexto(), y++);
-        addCampoTexto(infoPanel, gbc, "Pregunta:", pregunta.getPreguntaDirecta(), y++);
-        addCampoTexto(infoPanel, gbc, "Distractor A:", pregunta.getDistractor1(), y++);
-        addCampoTexto(infoPanel, gbc, "Distractor B:", pregunta.getDistractor2(), y++);
-        addCampoTexto(infoPanel, gbc, "Distractor C:", pregunta.getDistractor3(), y++);
-        addCampoTexto(infoPanel, gbc, "Distractor D:", pregunta.getDistractor4(), y++);
-        addCampoTexto(infoPanel, gbc, "Respuesta:", pregunta.getRespuestaCorrecta(), y++);
+        addCampoTexto(infoPanel, gbc, "Pregunta Directa:", pregunta.getPreguntaDirecta(), y++);
+
+        // Opciones
+        if (pregunta.getOpciones() != null && !pregunta.getOpciones().isEmpty()) {
+            StringBuilder sbOpciones = new StringBuilder();
+            for (OpcionRespuesta op : pregunta.getOpciones()) {
+                sbOpciones.append(op.clave()).append(") ").append(op.texto()).append("\n");
+            }
+            addCampoTexto(infoPanel, gbc, "Opciones:", sbOpciones.toString().trim(), y++);
+        } else {
+            addCampoTexto(infoPanel, gbc, "Distractor A:", pregunta.getDistractor1(), y++);
+            addCampoTexto(infoPanel, gbc, "Distractor B:", pregunta.getDistractor2(), y++);
+            addCampoTexto(infoPanel, gbc, "Distractor C:", pregunta.getDistractor3(), y++);
+            addCampoTexto(infoPanel, gbc, "Distractor D:", pregunta.getDistractor4(), y++);
+        }
+
+        // Respuestas correctas
+        String respCorrectasStr = (pregunta.getRespuestasCorrectas() != null && !pregunta.getRespuestasCorrectas().isEmpty())
+                ? String.join(", ", pregunta.getRespuestasCorrectas())
+                : pregunta.getRespuestaCorrecta();
+        addCampoTexto(infoPanel, gbc, "Respuesta(s) Correcta(s):", respCorrectasStr, y++);
+
         addCampoTexto(infoPanel, gbc, "Justificación:", pregunta.getJustificacion(), y++);
         addCampoTexto(infoPanel, gbc, "Bibliografía:", pregunta.getBibliografia(), y++);
         addCampoTexto(infoPanel, gbc, "Competencia:", pregunta.getCompetencia(), y++);
@@ -52,8 +75,29 @@ public class DetallePreguntaDialog extends JDialog {
         addCampoTexto(infoPanel, gbc, "Subtema:", pregunta.getSubtema(), y++);
         addCampoTexto(infoPanel, gbc, "Dificultad:", pregunta.getNivelDificultad(), y++);
 
+        // ── Decorator: Características enriquecidas ──────────────────────
+        DecoratedQuestionView view;
+        if (preguntaController != null) {
+            view = preguntaController.describirPregunta(pregunta.getId());
+        } else {
+            co.edu.unicauca.bancopreguntas.domain.decorator.QuestionComponent comp =
+                    QuestionDecoratorFactory.decorateFromEntity(pregunta);
+            view = new DecoratedQuestionView(comp.getDescription(), comp.getScore());
+        }
+
+        addCampoTexto(infoPanel, gbc, "Descripción Decorada:", view.description(), y++);
+        addCampoTexto(infoPanel, gbc, "Puntaje / Score:", String.format("%.2f", view.score()), y++);
+
         JScrollPane scrollPane = new JScrollPane(infoPanel);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
         mainPanel.add(scrollPane, BorderLayout.CENTER);
+
+        JButton btnCerrar = new JButton("Cerrar");
+        UIUtils.stylizeSecondaryButton(btnCerrar);
+        btnCerrar.addActionListener(e -> dispose());
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnCerrar);
+        mainPanel.add(btnPanel, BorderLayout.SOUTH);
 
         add(mainPanel);
     }
@@ -65,7 +109,7 @@ public class DetallePreguntaDialog extends JDialog {
         panel.add(lbl, gbc);
 
         gbc.gridx = 1; gbc.weightx = 1.0;
-        JTextArea area = new JTextArea(text);
+        JTextArea area = new JTextArea(text != null ? text : "");
         area.setFont(UIUtils.FONT_REGULAR);
         area.setWrapStyleWord(true);
         area.setLineWrap(true);

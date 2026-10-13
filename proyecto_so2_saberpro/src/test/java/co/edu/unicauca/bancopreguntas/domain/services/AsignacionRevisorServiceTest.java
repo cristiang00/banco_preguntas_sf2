@@ -1,24 +1,32 @@
 package co.edu.unicauca.bancopreguntas.domain.services;
 
-import co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta;
-import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
-import co.edu.unicauca.bancopreguntas.domain.repositories.AsignacionRevisorRepository;
-import co.edu.unicauca.bancopreguntas.domain.repositories.PreguntaRepository;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.unicauca.taller2.usuarios.access.UsuarioRepository;
 import com.unicauca.taller2.usuarios.model.EstadoUsuario;
 import com.unicauca.taller2.usuarios.model.Rol;
 import com.unicauca.taller2.usuarios.model.Usuario;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta;
+import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
+import co.edu.unicauca.bancopreguntas.domain.repositories.AsignacionRevisorRepository;
+import co.edu.unicauca.bancopreguntas.domain.repositories.PreguntaRepository;
 
 class AsignacionRevisorServiceTest {
 
@@ -36,9 +44,9 @@ class AsignacionRevisorServiceTest {
         service = new AsignacionRevisorService(asignacionRepository, preguntaRepository, usuarioRepository);
     }
 
-    // -------------------------------------------------------------------------
+
     // Tests existentes (deben seguir pasando)
-    // -------------------------------------------------------------------------
+ 
 
     @Test
     void asignar_preguntaNoPendiente_lanzaExcepcion() {
@@ -92,9 +100,8 @@ class AsignacionRevisorServiceTest {
         verify(asignacionRepository, times(1)).asignar(1, 3);
     }
 
-    // -------------------------------------------------------------------------
-    // Tests nuevos — Observer + transición de estado
-    // -------------------------------------------------------------------------
+    // Tests nuevos  Observer ---- transición de estado
+  
 
     @Test
     void asignar_exitoso_notificaObservadorUnaVez() {

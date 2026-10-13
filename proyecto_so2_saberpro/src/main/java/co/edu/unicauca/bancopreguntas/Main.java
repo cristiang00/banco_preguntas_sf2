@@ -67,8 +67,14 @@ public class Main {
             UsuarioService usuarioService = new UsuarioService(usuarioRepository, hasher, policy);
             AutenticacionService autenticacionService = new AutenticacionService(usuarioRepository, hasher);
 
-            // 4. Inicializar servicios del dominio de preguntas
+            // 4. Inicializar servicios del dominio de preguntas y Facade
             PreguntaService preguntaService = new PreguntaService(preguntaRepository);
+            co.edu.unicauca.bancopreguntas.domain.facade.QuestionBankFacade questionBankFacade =
+                new co.edu.unicauca.bancopreguntas.domain.facade.QuestionBankFacade(
+                    preguntaService,
+                    new co.edu.unicauca.bancopreguntas.domain.facade.QuestionValidator(),
+                    new co.edu.unicauca.bancopreguntas.domain.facade.QuestionPublisher()
+                );
             AsignacionRevisorService asignacionService = new AsignacionRevisorService(
                 asignacionRepository, preguntaRepository, usuarioRepository);
 
@@ -97,7 +103,7 @@ public class Main {
 
                     frame.setVisible(true);
                 } else {
-                    PreguntaController preguntaController = new PreguntaController(preguntaService, usuario.getId());
+                    PreguntaController preguntaController = new PreguntaController(questionBankFacade, usuario.getId(), usuario.getRol());
                     new MenuGenericoFrame(usuario, loginFrameWrapper[0], preguntaController, notificacionRepository).setVisible(true);
                 }
             };

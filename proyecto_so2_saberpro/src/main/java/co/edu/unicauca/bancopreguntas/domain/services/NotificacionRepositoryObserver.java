@@ -1,15 +1,16 @@
 package co.edu.unicauca.bancopreguntas.domain.services;
 
+import java.time.LocalDateTime;
+
+import com.unicauca.taller2.usuarios.model.Usuario;
+
 import co.edu.unicauca.bancopreguntas.domain.entities.Notificacion;
 import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
 import co.edu.unicauca.bancopreguntas.domain.repositories.NotificacionRepository;
-import com.unicauca.taller2.usuarios.model.Usuario;
-
-import java.time.LocalDateTime;
 
 /**
- * Observer 1 — persiste cada notificación en la base de datos SQLite.
- * Vive en el paquete de servicios de dominio (o puede moverse a dataaccess).
+ * Observer 1  persiste cada notificación en la base de datos SQLite.
+ * Vive en el paquete de servicios de dominio 
  */
 public class NotificacionRepositoryObserver implements NotificadorAsignacion {
 

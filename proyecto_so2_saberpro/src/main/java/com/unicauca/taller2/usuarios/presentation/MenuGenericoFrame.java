@@ -127,65 +127,71 @@ public class MenuGenericoFrame extends JFrame {
 
         List<String> opciones = MENU_OPTIONS.getOrDefault(usuario.getRol(), Collections.emptyList());
 
-        // Si es autor de preguntas y tenemos el controlador, asignamos las acciones reales
-        if (usuario.getRol() == Rol.AUTOR_PREGUNTAS && preguntaController != null) {
-            for (String opcion : opciones) {
-                JButton btn = new JButton(opcion);
-                UIUtils.stylizeSidebarButton(btn);
+        // Construir botones según rol
+        for (String opcion : opciones) {
+            JButton btn = new JButton(opcion);
+            UIUtils.stylizeSidebarButton(btn);
 
-                if (opcion.equals("📝  Crear Pregunta")) {
-                    btn.addActionListener(e -> {
-                        JDialog dialog = new JDialog(MenuGenericoFrame.this, "Crear Pregunta", true);
-                        co.edu.unicauca.bancopreguntas.presentation.views.CrearPreguntaPanel panel = new co.edu.unicauca.bancopreguntas.presentation.views.CrearPreguntaPanel(preguntaController);
-                        dialog.setContentPane(panel);
-                        dialog.pack();
-                        dialog.setLocationRelativeTo(MenuGenericoFrame.this);
-                        dialog.setVisible(true);
-                    });
-                    opcionesPanel.add(btn);
-                } else if (opcion.equals("📋  Mis Preguntas")) {
-                    btn.addActionListener(e -> {
-                        JDialog dialog = new JDialog(MenuGenericoFrame.this, "Mis Preguntas", true);
-                        co.edu.unicauca.bancopreguntas.presentation.views.ListarPreguntasPanel panel = new co.edu.unicauca.bancopreguntas.presentation.views.ListarPreguntasPanel(preguntaController);
-                        panel.actualizarDatos();
-                        dialog.setContentPane(panel);
-                        dialog.pack();
-                        dialog.setMinimumSize(new Dimension(800, 500));
-                        dialog.setLocationRelativeTo(MenuGenericoFrame.this);
-                        dialog.setVisible(true);
-                    });
-                    opcionesPanel.add(btn);
-                } else {
-                    opcionesPanel.add(crearBotonMenuPlaceholder(opcion + " (próximamente)"));
-                }
-            }
-        } else if (usuario.getRol() == Rol.REVISOR && notificacionRepository != null) {
-            // Para el REVISOR, habilitar solo "Mis Notificaciones"
-            for (String opcion : opciones) {
-                if (opcion.equals("🔔  Mis Notificaciones")) {
-                    JButton btn = new JButton(opcion);
-                    UIUtils.stylizeSidebarButton(btn);
-                    btn.addActionListener(e -> {
-                        JDialog dialog = new JDialog(MenuGenericoFrame.this, "Mis Notificaciones", true);
-                        co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel panel =
-                                new co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel(
-                                        notificacionRepository, usuario.getId());
-                        panel.cargarDatos();
-                        dialog.setContentPane(panel);
-                        dialog.pack();
-                        dialog.setMinimumSize(new Dimension(700, 450));
-                        dialog.setLocationRelativeTo(MenuGenericoFrame.this);
-                        dialog.setVisible(true);
-                    });
-                    opcionesPanel.add(btn);
-                } else {
-                    opcionesPanel.add(crearBotonMenuPlaceholder(opcion + " (próximamente)"));
-                }
-            }
-        } else {
-            for (String opcion : opciones) {
-                JButton btn = crearBotonMenuPlaceholder(opcion + " (próximamente)");
+            if (opcion.equals("📝  Crear Pregunta") && preguntaController != null) {
+                btn.addActionListener(e -> {
+                    JDialog dialog = new JDialog(MenuGenericoFrame.this, "Crear Pregunta", true);
+                    co.edu.unicauca.bancopreguntas.presentation.views.CrearPreguntaPanel panel =
+                            new co.edu.unicauca.bancopreguntas.presentation.views.CrearPreguntaPanel(preguntaController);
+                    dialog.setContentPane(panel);
+                    dialog.pack();
+                    dialog.setLocationRelativeTo(MenuGenericoFrame.this);
+                    dialog.setVisible(true);
+                });
                 opcionesPanel.add(btn);
+            } else if ((opcion.equals("📋  Mis Preguntas")
+                    || opcion.equals("🔍  Consultar Banco de Preguntas")
+                    || opcion.equals("🔍  Revisar Preguntas Pendientes")
+                    || opcion.equals("✅  Preguntas Aprobadas")
+                    || opcion.equals("❌  Preguntas Rechazadas"))
+                    && preguntaController != null) {
+                btn.addActionListener(e -> {
+                    List<co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta> filtroEstados = null;
+                    if (opcion.equals("🔍  Revisar Preguntas Pendientes")) {
+                        filtroEstados = Arrays.asList(
+                                co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta.EN_REVISION,
+                                co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta.PENDIENTE_REVISION
+                        );
+                    } else if (opcion.equals("✅  Preguntas Aprobadas")) {
+                        filtroEstados = Collections.singletonList(
+                                co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta.APROBADA
+                        );
+                    } else if (opcion.equals("❌  Preguntas Rechazadas")) {
+                        filtroEstados = Collections.singletonList(
+                                co.edu.unicauca.bancopreguntas.domain.entities.EstadoPregunta.RECHAZADA
+                        );
+                    }
+                    JDialog dialog = new JDialog(MenuGenericoFrame.this, opcion.trim(), true);
+                    co.edu.unicauca.bancopreguntas.presentation.views.ListarPreguntasPanel panel =
+                            new co.edu.unicauca.bancopreguntas.presentation.views.ListarPreguntasPanel(preguntaController, filtroEstados);
+                    panel.actualizarDatos();
+                    dialog.setContentPane(panel);
+                    dialog.pack();
+                    dialog.setMinimumSize(new Dimension(860, 520));
+                    dialog.setLocationRelativeTo(MenuGenericoFrame.this);
+                    dialog.setVisible(true);
+                });
+                opcionesPanel.add(btn);
+            } else if (opcion.equals("🔔  Mis Notificaciones") && notificacionRepository != null) {
+                btn.addActionListener(e -> {
+                    JDialog dialog = new JDialog(MenuGenericoFrame.this, "Mis Notificaciones", true);
+                    co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel panel =
+                            new co.edu.unicauca.bancopreguntas.presentation.views.NotificacionesPanel(
+                                    notificacionRepository, usuario.getId());
+                    panel.cargarDatos();
+                    dialog.setContentPane(panel);
+                    dialog.pack();
+                    dialog.setMinimumSize(new Dimension(700, 450));
+                    dialog.setLocationRelativeTo(MenuGenericoFrame.this);
+                    dialog.setVisible(true);
+                });
+                opcionesPanel.add(btn);
+            } else {
+                opcionesPanel.add(crearBotonMenuPlaceholder(opcion + " (próximamente)"));
             }
         }
 

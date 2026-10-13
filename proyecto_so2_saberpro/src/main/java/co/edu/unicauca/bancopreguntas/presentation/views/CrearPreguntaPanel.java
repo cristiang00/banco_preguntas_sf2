@@ -1,25 +1,29 @@
 package co.edu.unicauca.bancopreguntas.presentation.views;
 
+import co.edu.unicauca.bancopreguntas.domain.entities.OpcionRespuesta;
 import co.edu.unicauca.bancopreguntas.domain.entities.Pregunta;
 import co.edu.unicauca.bancopreguntas.domain.entities.PreguntaBuilder;
+import co.edu.unicauca.bancopreguntas.domain.entities.TipoPregunta;
 import co.edu.unicauca.bancopreguntas.presentation.controllers.PreguntaController;
 import co.edu.unicauca.bancopreguntas.presentation.utils.UIUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Panel para crear una nueva pregunta.
- * Muestra un banner inline verde (éxito) o rojo (error) en lugar de
- * JOptionPane,
- * siguiendo el estilo del prototipo de interfaz.
+ * Muestra un banner inline verde (éxito) o rojo (error) en lugar de JOptionPane,
+ * y soporta Selección Única, Selección Múltiple y Verdadero/Falso.
  */
 public class CrearPreguntaPanel extends JPanel {
 
     private final PreguntaController preguntaController;
 
     // Campos del formulario
+    private JComboBox<TipoPregunta> cmbTipoPregunta;
     private JTextArea txtContexto;
     private JTextArea txtPreguntaDirecta;
     private JTextField txtDistractorA;
@@ -27,6 +31,13 @@ public class CrearPreguntaPanel extends JPanel {
     private JTextField txtDistractorC;
     private JTextField txtDistractorD;
     private JComboBox<String> cmbRespuestaCorrecta;
+    private JCheckBox chkRespA;
+    private JCheckBox chkRespB;
+    private JCheckBox chkRespC;
+    private JCheckBox chkRespD;
+    private JPanel panelRespuestasMultiples;
+    private JPanel panelRespuestaUnica;
+
     private JTextArea txtJustificacion;
     private JTextArea txtBibliografia;
     private JComboBox<String> cmbCompetencia;
@@ -80,6 +91,12 @@ public class CrearPreguntaPanel extends JPanel {
 
         int y = 0;
 
+        // Tipo de Pregunta *
+        cmbTipoPregunta = new JComboBox<>(TipoPregunta.values());
+        UIUtils.stylizeTextField(cmbTipoPregunta);
+        cmbTipoPregunta.addActionListener(e -> onTipoPreguntaChanged());
+        y = agregarCampoCombo(formPanel, gbc, y, "Tipo de Pregunta: *", cmbTipoPregunta, true);
+
         // Contexto *
         y = agregarCampoArea(formPanel, gbc, y, "Contexto: *", txtContexto = new JTextArea(3, 40), true);
 
@@ -88,24 +105,53 @@ public class CrearPreguntaPanel extends JPanel {
 
         // Distractor A *
         txtDistractorA = new JTextField();
-        y = agregarCampoField(formPanel, gbc, y, "Distractor A: *", txtDistractorA, true);
+        y = agregarCampoField(formPanel, gbc, y, "Opción / Distractor A: *", txtDistractorA, true);
 
         // Distractor B *
         txtDistractorB = new JTextField();
-        y = agregarCampoField(formPanel, gbc, y, "Distractor B: *", txtDistractorB, true);
+        y = agregarCampoField(formPanel, gbc, y, "Opción / Distractor B: *", txtDistractorB, true);
 
         // Distractor C *
         txtDistractorC = new JTextField();
-        y = agregarCampoField(formPanel, gbc, y, "Distractor C: *", txtDistractorC, true);
+        y = agregarCampoField(formPanel, gbc, y, "Opción / Distractor C: *", txtDistractorC, true);
 
         // Distractor D *
         txtDistractorD = new JTextField();
-        y = agregarCampoField(formPanel, gbc, y, "Distractor D: *", txtDistractorD, true);
+        y = agregarCampoField(formPanel, gbc, y, "Opción / Distractor D: *", txtDistractorD, true);
 
-        // Respuesta Correcta *
+        // Respuesta Correcta para Única / VF
         cmbRespuestaCorrecta = new JComboBox<>(new String[] { "", "A", "B", "C", "D" });
         UIUtils.stylizeTextField(cmbRespuestaCorrecta);
-        y = agregarCampoCombo(formPanel, gbc, y, "Respuesta Correcta: *", cmbRespuestaCorrecta, true);
+        panelRespuestaUnica = new JPanel(new BorderLayout());
+        panelRespuestaUnica.setOpaque(false);
+        panelRespuestaUnica.add(cmbRespuestaCorrecta, BorderLayout.CENTER);
+
+        // Respuestas múltiples (Checkboxes)
+        panelRespuestasMultiples = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        panelRespuestasMultiples.setOpaque(false);
+        chkRespA = new JCheckBox("A");
+        chkRespB = new JCheckBox("B");
+        chkRespC = new JCheckBox("C");
+        chkRespD = new JCheckBox("D");
+        panelRespuestasMultiples.add(chkRespA);
+        panelRespuestasMultiples.add(chkRespB);
+        panelRespuestasMultiples.add(chkRespC);
+        panelRespuestasMultiples.add(chkRespD);
+        panelRespuestasMultiples.setVisible(false);
+
+        JPanel panelContenedorRespuestas = new JPanel(new CardLayout());
+        panelContenedorRespuestas.setOpaque(false);
+        panelContenedorRespuestas.add(panelRespuestaUnica, "UNICA");
+        panelContenedorRespuestas.add(panelRespuestasMultiples, "MULTIPLE");
+
+        gbc.gridx = 0;
+        gbc.gridy = y;
+        gbc.weightx = 0;
+        formPanel.add(crearLabel("Respuesta(s) Correcta(s): *", true), gbc);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        formPanel.add(panelContenedorRespuestas, gbc);
+        y++;
 
         // Justificación * (HU01: campo obligatorio)
         y = agregarCampoArea(formPanel, gbc, y, "Justificación: *", txtJustificacion = new JTextArea(2, 40), true);
@@ -157,6 +203,54 @@ public class CrearPreguntaPanel extends JPanel {
         buttonPanel.add(btnGuardar);
 
         add(buttonPanel, BorderLayout.SOUTH);
+    }
+
+    private void onTipoPreguntaChanged() {
+        TipoPregunta tipo = (TipoPregunta) cmbTipoPregunta.getSelectedItem();
+        if (tipo == null) return;
+
+        if (tipo == TipoPregunta.VERDADERO_FALSO) {
+            txtDistractorA.setText("Verdadero");
+            txtDistractorB.setText("Falso");
+            txtDistractorA.setEditable(false);
+            txtDistractorB.setEditable(false);
+            txtDistractorC.setText("N/A");
+            txtDistractorD.setText("N/A");
+            txtDistractorC.setEnabled(false);
+            txtDistractorD.setEnabled(false);
+
+            cmbRespuestaCorrecta.setModel(new DefaultComboBoxModel<>(new String[] { "", "A", "B" }));
+            panelRespuestaUnica.setVisible(true);
+            panelRespuestasMultiples.setVisible(false);
+        } else if (tipo == TipoPregunta.SELECCION_MULTIPLE) {
+            txtDistractorA.setEditable(true);
+            txtDistractorB.setEditable(true);
+            txtDistractorC.setEnabled(true);
+            txtDistractorD.setEnabled(true);
+            if ("Verdadero".equals(txtDistractorA.getText())) txtDistractorA.setText("");
+            if ("Falso".equals(txtDistractorB.getText())) txtDistractorB.setText("");
+            if ("N/A".equals(txtDistractorC.getText())) txtDistractorC.setText("");
+            if ("N/A".equals(txtDistractorD.getText())) txtDistractorD.setText("");
+
+            panelRespuestaUnica.setVisible(false);
+            panelRespuestasMultiples.setVisible(true);
+        } else {
+            // SELECCION_UNICA
+            txtDistractorA.setEditable(true);
+            txtDistractorB.setEditable(true);
+            txtDistractorC.setEnabled(true);
+            txtDistractorD.setEnabled(true);
+            if ("Verdadero".equals(txtDistractorA.getText())) txtDistractorA.setText("");
+            if ("Falso".equals(txtDistractorB.getText())) txtDistractorB.setText("");
+            if ("N/A".equals(txtDistractorC.getText())) txtDistractorC.setText("");
+            if ("N/A".equals(txtDistractorD.getText())) txtDistractorD.setText("");
+
+            cmbRespuestaCorrecta.setModel(new DefaultComboBoxModel<>(new String[] { "", "A", "B", "C", "D" }));
+            panelRespuestaUnica.setVisible(true);
+            panelRespuestasMultiples.setVisible(false);
+        }
+        revalidate();
+        repaint();
     }
 
     // ── Helpers de layout ─────────────────────────────────────────────────────
@@ -216,14 +310,54 @@ public class CrearPreguntaPanel extends JPanel {
     private void guardarPregunta() {
         ocultarBanner();
 
+        TipoPregunta tipo = (TipoPregunta) cmbTipoPregunta.getSelectedItem();
+        if (tipo == null) {
+            tipo = TipoPregunta.SELECCION_UNICA;
+        }
+
+        List<OpcionRespuesta> opciones = new ArrayList<>();
+        List<String> respuestasCorrectas = new ArrayList<>();
+
+        if (tipo == TipoPregunta.VERDADERO_FALSO) {
+            opciones.add(new OpcionRespuesta("A", "Verdadero"));
+            opciones.add(new OpcionRespuesta("B", "Falso"));
+            String resp = (String) cmbRespuestaCorrecta.getSelectedItem();
+            if (resp != null && !resp.trim().isEmpty()) {
+                respuestasCorrectas.add(resp.trim());
+            }
+        } else if (tipo == TipoPregunta.SELECCION_MULTIPLE) {
+            opciones.add(new OpcionRespuesta("A", txtDistractorA.getText()));
+            opciones.add(new OpcionRespuesta("B", txtDistractorB.getText()));
+            opciones.add(new OpcionRespuesta("C", txtDistractorC.getText()));
+            opciones.add(new OpcionRespuesta("D", txtDistractorD.getText()));
+            if (chkRespA.isSelected()) respuestasCorrectas.add("A");
+            if (chkRespB.isSelected()) respuestasCorrectas.add("B");
+            if (chkRespC.isSelected()) respuestasCorrectas.add("C");
+            if (chkRespD.isSelected()) respuestasCorrectas.add("D");
+        } else {
+            opciones.add(new OpcionRespuesta("A", txtDistractorA.getText()));
+            opciones.add(new OpcionRespuesta("B", txtDistractorB.getText()));
+            opciones.add(new OpcionRespuesta("C", txtDistractorC.getText()));
+            opciones.add(new OpcionRespuesta("D", txtDistractorD.getText()));
+            String resp = (String) cmbRespuestaCorrecta.getSelectedItem();
+            if (resp != null && !resp.trim().isEmpty()) {
+                respuestasCorrectas.add(resp.trim());
+            }
+        }
+
+        String respuestaLegacy = respuestasCorrectas.isEmpty() ? "" : respuestasCorrectas.get(0);
+
         Pregunta p = new PreguntaBuilder()
+                .conTipo(tipo)
                 .conContexto(txtContexto.getText())
                 .conPreguntaDirecta(txtPreguntaDirecta.getText())
                 .conDistractor1(txtDistractorA.getText())
                 .conDistractor2(txtDistractorB.getText())
                 .conDistractor3(txtDistractorC.getText())
                 .conDistractor4(txtDistractorD.getText())
-                .conRespuestaCorrecta((String) cmbRespuestaCorrecta.getSelectedItem())
+                .conOpciones(opciones)
+                .conRespuestasCorrectas(respuestasCorrectas)
+                .conRespuestaCorrecta(respuestaLegacy)
                 .conJustificacion(txtJustificacion.getText())
                 .conBibliografia(txtBibliografia.getText())
                 .conCompetencia(cmbCompetencia.getSelectedItem() != null
@@ -240,7 +374,7 @@ public class CrearPreguntaPanel extends JPanel {
 
         try {
             preguntaController.crearPregunta(p);
-            mostrarBannerExito(" Pregunta guardada correctamente en estado \"En borrador\"");
+            mostrarBannerExito("✓  Pregunta guardada correctamente en estado \"En borrador\"");
             limpiarCampos();
         } catch (IllegalArgumentException ex) {
             mostrarBannerError("✕  " + ex.getMessage());
@@ -282,6 +416,7 @@ public class CrearPreguntaPanel extends JPanel {
     }
 
     private void limpiarCampos() {
+        cmbTipoPregunta.setSelectedIndex(0);
         txtContexto.setText("");
         txtPreguntaDirecta.setText("");
         txtDistractorA.setText("");
@@ -289,11 +424,16 @@ public class CrearPreguntaPanel extends JPanel {
         txtDistractorC.setText("");
         txtDistractorD.setText("");
         cmbRespuestaCorrecta.setSelectedIndex(0);
+        chkRespA.setSelected(false);
+        chkRespB.setSelected(false);
+        chkRespC.setSelected(false);
+        chkRespD.setSelected(false);
         txtJustificacion.setText("");
         txtBibliografia.setText("");
         cmbCompetencia.setSelectedIndex(0);
         cmbTema.setSelectedIndex(0);
         cmbSubtema.setSelectedIndex(0);
         cmbDificultad.setSelectedIndex(0);
+        onTipoPreguntaChanged();
     }
 }

@@ -10,6 +10,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.ArrayList;
 import co.edu.unicauca.bancopreguntas.presentation.utils.UIUtils;
 
 public class ListarPreguntasPanel extends JPanel {
@@ -25,9 +26,24 @@ public class ListarPreguntasPanel extends JPanel {
     private final int TAMANO_PAGINA = 10;
     private int totalPaginas = 1;
 
-    public ListarPreguntasPanel(PreguntaController preguntaController) {
+    public ListarPreguntasPanel(PreguntaController preguntaController, List<EstadoPregunta> estadosIniciales) {
         this.preguntaController = preguntaController;
         inicializarUI();
+        if (estadosIniciales != null && !estadosIniciales.isEmpty()) {
+            List<Integer> indices = new ArrayList<>();
+            EstadoPregunta[] all = EstadoPregunta.values();
+            for (int i = 0; i < all.length; i++) {
+                if (estadosIniciales.contains(all[i])) {
+                    indices.add(i);
+                }
+            }
+            int[] indicesArr = indices.stream().mapToInt(Integer::intValue).toArray();
+            listaEstados.setSelectedIndices(indicesArr);
+        }
+    }
+
+    public ListarPreguntasPanel(PreguntaController preguntaController) {
+        this(preguntaController, null);
     }
 
     public void actualizarDatos() {
@@ -136,7 +152,12 @@ public class ListarPreguntasPanel extends JPanel {
         panelPaginacion.add(btnSiguiente);
         panelInferior.add(panelPaginacion, BorderLayout.CENTER);
 
-        JPanel panelAcciones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel panelAcciones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 4));
+        
+        JButton btnImportar = new JButton("📥 Importar Externa");
+        UIUtils.stylizeSecondaryButton(btnImportar);
+        btnImportar.addActionListener(e -> importarExterna());
+
         JButton btnVerDetalle = new JButton("Ver Detalle");
         UIUtils.stylizeSecondaryButton(btnVerDetalle);
         btnVerDetalle.addActionListener(e -> {
@@ -148,12 +169,41 @@ public class ListarPreguntasPanel extends JPanel {
             }
         });
 
+        JButton btnCambiarEstado = new JButton("⚙️ Cambiar Estado");
+        UIUtils.stylizeSecondaryButton(btnCambiarEstado);
+        btnCambiarEstado.addActionListener(e -> cambiarEstado());
+
+        JButton btnEvaluar = new JButton("🎯 Evaluar Respuesta");
+        UIUtils.stylizeSecondaryButton(btnEvaluar);
+        btnEvaluar.addActionListener(e -> evaluarRespuesta());
+
         JButton btnEnviarRevision = new JButton("Enviar a Revisión");
         UIUtils.stylizePrimaryButton(btnEnviarRevision);
         btnEnviarRevision.addActionListener(e -> enviarARevision());
 
-        panelAcciones.add(btnVerDetalle);
-        panelAcciones.add(btnEnviarRevision);
+        boolean esRevisor = preguntaController != null && preguntaController.getRol() == com.unicauca.taller2.usuarios.model.Rol.REVISOR;
+
+        if (esRevisor) {
+            JButton btnAprobar = new JButton("✅ Aprobar");
+            UIUtils.stylizePrimaryButton(btnAprobar);
+            btnAprobar.addActionListener(e -> aprobarSeleccionada());
+
+            JButton btnRechazar = new JButton("❌ Rechazar");
+            UIUtils.stylizeSecondaryButton(btnRechazar);
+            btnRechazar.addActionListener(e -> rechazarSeleccionada());
+
+            panelAcciones.add(btnVerDetalle);
+            panelAcciones.add(btnAprobar);
+            panelAcciones.add(btnRechazar);
+            panelAcciones.add(btnEvaluar);
+            panelAcciones.add(btnCambiarEstado);
+        } else {
+            panelAcciones.add(btnImportar);
+            panelAcciones.add(btnVerDetalle);
+            panelAcciones.add(btnCambiarEstado);
+            panelAcciones.add(btnEvaluar);
+            panelAcciones.add(btnEnviarRevision);
+        }
         panelInferior.add(panelAcciones, BorderLayout.EAST);
 
         add(panelInferior, BorderLayout.SOUTH);
@@ -197,8 +247,8 @@ public class ListarPreguntasPanel extends JPanel {
         try {
             Pregunta p = (Pregunta) tableModel.getValueAt(row, 5); // recuperar objeto oculto
             Pregunta detalleCompleto = preguntaController.obtenerDetalle(p.getId());
-            if(detalleCompleto != null){
-                DetallePreguntaDialog dialog = new DetallePreguntaDialog(SwingUtilities.getWindowAncestor(this), detalleCompleto);
+            if (detalleCompleto != null) {
+                DetallePreguntaDialog dialog = new DetallePreguntaDialog(SwingUtilities.getWindowAncestor(this), detalleCompleto, preguntaController);
                 dialog.setVisible(true);
             } else {
                 JOptionPane.showMessageDialog(this, "No se encontró el detalle de la pregunta.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -207,6 +257,158 @@ public class ListarPreguntasPanel extends JPanel {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "Error al mostrar el detalle: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void importarExterna() {
+        try {
+            Pregunta importada = preguntaController.importarPreguntaExterna();
+            JOptionPane.showMessageDialog(this,
+                    "Pregunta importada exitosamente desde servicio externo (Adapter):\nID: " + importada.getId()
+                            + "\nEstado: " + importada.getEstado().getLabel()
+                            + "\nTipo: " + (importada.getTipo() != null ? importada.getTipo().getNombre() : "N/A"),
+                    "Importación Exitosa", JOptionPane.INFORMATION_MESSAGE);
+            actualizarDatos();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error al importar pregunta: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void cambiarEstado() {
+        int row = tabla.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Seleccione una pregunta para cambiar su estado.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        Pregunta p = (Pregunta) tableModel.getValueAt(row, 5);
+
+        String[] opciones = {"Enviar a Revisión", "Aprobar", "Rechazar", "Publicar", "Archivar", "Devolver a Borrador"};
+        String seleccion = (String) JOptionPane.showInputDialog(
+                this,
+                "Estado actual: " + p.getEstado().getLabel() + "\nSeleccione la acción a realizar:",
+                "Ciclo de Vida (Patrón State)",
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                opciones,
+                opciones[0]);
+
+        if (seleccion == null) return;
+
+        try {
+            switch (seleccion) {
+                case "Enviar a Revisión":
+                    preguntaController.enviarARevision(p.getId());
+                    break;
+                case "Aprobar":
+                    preguntaController.aprobarPregunta(p.getId());
+                    break;
+                case "Rechazar":
+                    String motivo = JOptionPane.showInputDialog(this, "Ingrese el motivo de rechazo:", "Rechazar Pregunta", JOptionPane.PLAIN_MESSAGE);
+                    if (motivo == null || motivo.trim().isEmpty()) {
+                        JOptionPane.showMessageDialog(this, "El motivo de rechazo es obligatorio.", "Aviso", JOptionPane.WARNING_MESSAGE);
+                        return;
+                    }
+                    preguntaController.rechazarPregunta(p.getId(), motivo.trim());
+                    break;
+                case "Publicar":
+                    preguntaController.publicarPregunta(p.getId());
+                    break;
+                case "Archivar":
+                    preguntaController.archivarPregunta(p.getId());
+                    break;
+                case "Devolver a Borrador":
+                    preguntaController.devolverABorrador(p.getId());
+                    break;
+            }
+            JOptionPane.showMessageDialog(this, "Transición de estado ejecutada con éxito.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+            actualizarDatos();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error en transición de estado:\n" + ex.getMessage(), "Error de Estado", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void evaluarRespuesta() {
+        int row = tabla.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Seleccione una pregunta para evaluar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        Pregunta p = (Pregunta) tableModel.getValueAt(row, 5);
+        Pregunta detalle = preguntaController.obtenerDetalle(p.getId());
+        if (detalle == null) {
+            detalle = p;
+        }
+
+        // Construir modal interactivo de evaluación
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Evaluar Respuesta (Template Method)", Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setSize(480, 360);
+        dialog.setLocationRelativeTo(this);
+
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        JPanel info = new JPanel(new GridLayout(0, 1, 4, 4));
+        info.add(new JLabel("<html><b>Pregunta:</b> " + detalle.getPreguntaDirecta() + "</html>"));
+        info.add(new JLabel("<b>Estado:</b> " + detalle.getEstado().getLabel() + " (Debe ser Publicada)"));
+        info.add(new JLabel("<b>Tipo:</b> " + (detalle.getTipo() != null ? detalle.getTipo().getNombre() : "N/A")));
+
+        if (detalle.getOpciones() != null && !detalle.getOpciones().isEmpty()) {
+            StringBuilder sb = new StringBuilder("<html><b>Opciones:</b><br/>");
+            for (var op : detalle.getOpciones()) {
+                sb.append(op.clave()).append(") ").append(op.texto()).append("<br/>");
+            }
+            sb.append("</html>");
+            info.add(new JLabel(sb.toString()));
+        }
+
+        JPanel inputPanel = new JPanel(new BorderLayout(5, 5));
+        inputPanel.add(new JLabel("Ingrese respuesta (ej. A, o A,B): "), BorderLayout.NORTH);
+        JTextField txtRespuesta = new JTextField();
+        UIUtils.stylizeTextField(txtRespuesta);
+        inputPanel.add(txtRespuesta, BorderLayout.CENTER);
+
+        JLabel lblResultado = new JLabel(" ", JLabel.CENTER);
+        lblResultado.setFont(UIUtils.FONT_SUBTITLE);
+
+        JButton btnCalificar = new JButton("Calificar");
+        UIUtils.stylizePrimaryButton(btnCalificar);
+        final Pregunta targetP = detalle;
+        btnCalificar.addActionListener(e -> {
+            String val = txtRespuesta.getText().trim();
+            if (val.isEmpty()) {
+                lblResultado.setText("<html><font color='red'>Ingrese una respuesta.</font></html>");
+                return;
+            }
+            List<String> respuestas = java.util.Arrays.stream(val.split("[,; ]+"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            try {
+                var res = preguntaController.evaluarRespuesta(targetP.getId(), respuestas);
+                String color = res.correct() ? "green" : "red";
+                lblResultado.setText("<html><font color='" + color + "'><b>" + (res.correct() ? "¡CORRECTA!" : "INCORRECTA")
+                        + "</b> | Score: " + res.score() + "<br/>" + res.feedback() + "</font></html>");
+            } catch (Exception ex) {
+                lblResultado.setText("<html><font color='red'><b>Error:</b> " + ex.getMessage() + "</font></html>");
+            }
+        });
+
+        JPanel centerPanel = new JPanel(new BorderLayout(8, 8));
+        centerPanel.add(info, BorderLayout.NORTH);
+        centerPanel.add(inputPanel, BorderLayout.CENTER);
+        centerPanel.add(lblResultado, BorderLayout.SOUTH);
+
+        panel.add(centerPanel, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(btnCalificar);
+        JButton btnCerrar = new JButton("Cerrar");
+        UIUtils.stylizeSecondaryButton(btnCerrar);
+        btnCerrar.addActionListener(e -> dialog.dispose());
+        btnPanel.add(btnCerrar);
+        panel.add(btnPanel, BorderLayout.SOUTH);
+
+        dialog.setContentPane(panel);
+        dialog.setVisible(true);
     }
 
     private void enviarARevision() {
@@ -223,9 +425,53 @@ public class ListarPreguntasPanel extends JPanel {
                 preguntaController.enviarARevision(p.getId());
                 JOptionPane.showMessageDialog(this, "La pregunta ha sido enviada a revisión exitosamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
                 cargarDatos(); // Refrescar la tabla
-            } catch (IllegalArgumentException ex) {
+            } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
+        }
+    }
+
+    private void aprobarSeleccionada() {
+        int row = tabla.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Seleccione una pregunta para aprobar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        Pregunta p = (Pregunta) tableModel.getValueAt(row, 5);
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "¿Está seguro de aprobar la pregunta " + p.getId() + "?",
+                "Confirmar Aprobación",
+                JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        try {
+            preguntaController.aprobarPregunta(p.getId());
+            JOptionPane.showMessageDialog(this, "Pregunta " + p.getId() + " aprobada con éxito.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+            actualizarDatos();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error al aprobar la pregunta:\n" + ex.getMessage(), "Error de Estado", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void rechazarSeleccionada() {
+        int row = tabla.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Seleccione una pregunta para rechazar.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        Pregunta p = (Pregunta) tableModel.getValueAt(row, 5);
+        String motivo = JOptionPane.showInputDialog(this, "Ingrese el motivo del rechazo:", "Rechazar Pregunta", JOptionPane.PLAIN_MESSAGE);
+        if (motivo == null || motivo.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "El motivo de rechazo es obligatorio.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            preguntaController.rechazarPregunta(p.getId(), motivo.trim());
+            JOptionPane.showMessageDialog(this, "Pregunta " + p.getId() + " rechazada con éxito.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+            actualizarDatos();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error al rechazar la pregunta:\n" + ex.getMessage(), "Error de Estado", JOptionPane.ERROR_MESSAGE);
         }
     }
 }

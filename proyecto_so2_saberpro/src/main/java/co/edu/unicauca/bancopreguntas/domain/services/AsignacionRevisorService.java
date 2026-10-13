@@ -100,9 +100,11 @@ public class AsignacionRevisorService {
             }
         }
 
-        // transicionar a EN_REVISION tras la primera asignación exitosa
-        if (primerAsignado && pregunta.getEstado() == EstadoPregunta.PENDIENTE_REVISION) {
-            preguntaRepository.actualizarEstado(preguntaId, EstadoPregunta.EN_REVISION);
+        // transicionar a EN_REVISION tras la primera asignación exitosa usando el patrón State
+        if (primerAsignado && pregunta.getState() instanceof co.edu.unicauca.bancopreguntas.domain.state.PendingReviewState) {
+            String nombreRevisor = revisoresValidados.isEmpty() ? "Revisor" : revisoresValidados.get(0).getNombreCompleto();
+            pregunta.assignReviewer(nombreRevisor);
+            preguntaRepository.actualizarEstado(preguntaId, pregunta.getEstado());
         }
     }
 

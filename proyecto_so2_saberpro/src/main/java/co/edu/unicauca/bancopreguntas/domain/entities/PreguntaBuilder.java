@@ -3,9 +3,8 @@ package co.edu.unicauca.bancopreguntas.domain.entities;
 import java.time.LocalDateTime;
 
 /**
- * Builder para {@link Pregunta} — patrón GoF Creacional.
- * <p>
- * Responsabilidad: construir objetos {@code Pregunta} con una API fluida.
+ * Builder.
+ *  construir objetos {@code Pregunta} con una API fluida.
  * Las <strong>validaciones de negocio</strong> siguen siendo responsabilidad
  * exclusiva de
  * {@code PreguntaService.validarCampos()} (SRP); el Builder solo crea el
@@ -28,6 +27,52 @@ public class PreguntaBuilder {
     private String nivelDificultad;
     private int autorId;
     private String autorNombre;
+    private TipoPregunta tipo = TipoPregunta.SELECCION_UNICA;
+    private final java.util.List<OpcionRespuesta> opciones = new java.util.ArrayList<>();
+    private final java.util.Set<String> respuestasCorrectas = new java.util.LinkedHashSet<>();
+
+    public PreguntaBuilder conTipo(TipoPregunta tipo) {
+        if (tipo != null) {
+            this.tipo = tipo;
+        }
+        return this;
+    }
+
+    public PreguntaBuilder conOpcion(String clave, String texto) {
+        if (clave != null && texto != null) {
+            this.opciones.add(new OpcionRespuesta(clave, texto));
+        }
+        return this;
+    }
+
+    public PreguntaBuilder conOpciones(java.util.List<OpcionRespuesta> opciones) {
+        if (opciones != null) {
+            this.opciones.addAll(opciones);
+        }
+        return this;
+    }
+
+    public PreguntaBuilder conRespuestasCorrectas(String... respuestas) {
+        if (respuestas != null) {
+            for (String r : respuestas) {
+                if (r != null && !r.isBlank()) {
+                    this.respuestasCorrectas.add(r.trim().toUpperCase());
+                }
+            }
+        }
+        return this;
+    }
+
+    public PreguntaBuilder conRespuestasCorrectas(java.util.Collection<String> respuestas) {
+        if (respuestas != null) {
+            for (String r : respuestas) {
+                if (r != null && !r.isBlank()) {
+                    this.respuestasCorrectas.add(r.trim().toUpperCase());
+                }
+            }
+        }
+        return this;
+    }
 
     public PreguntaBuilder conContexto(String contexto) {
         this.contexto = contexto;
@@ -130,6 +175,13 @@ public class PreguntaBuilder {
         p.setAutorNombre(autorNombre);
         p.setEstado(EstadoPregunta.BORRADOR); // estado inicial fijo
         p.setFechaCreacion(LocalDateTime.now()); // timestamp del momento del build
+        p.setTipo(tipo);
+        if (!opciones.isEmpty()) {
+            p.setOpciones(opciones);
+        }
+        if (!respuestasCorrectas.isEmpty()) {
+            p.definirRespuestasCorrectas(respuestasCorrectas);
+        }
         return p;
     }
 }

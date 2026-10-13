@@ -1,9 +1,9 @@
 package com.unicauca.taller2.usuarios.presentation;
 
+import com.unicauca.taller2.usuarios.model.Usuario;
 import com.unicauca.taller2.usuarios.services.AutenticacionException;
 import com.unicauca.taller2.usuarios.services.AutenticacionService;
 import com.unicauca.taller2.usuarios.services.UsuarioService;
-import com.unicauca.taller2.usuarios.model.Usuario;
 
 import javax.swing.*;
 import java.awt.*;
