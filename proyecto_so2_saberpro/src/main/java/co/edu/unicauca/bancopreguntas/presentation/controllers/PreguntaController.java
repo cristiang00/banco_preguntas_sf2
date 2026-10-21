@@ -84,9 +84,7 @@ public class PreguntaController {
     }
 
     public Pregunta importarPreguntaExterna() {
-        Pregunta p = facade.importDefaultExternalQuestion();
-        p.setAutorId(autorId);
-        return p;
+        return facade.importDefaultExternalQuestion(autorId);
     }
 
     public List<Pregunta> listarMisPreguntas(List<EstadoPregunta> estadosFiltro, String nivelDificultad, int offset, int limit) {

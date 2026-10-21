@@ -311,8 +311,23 @@ public class QuestionBankFacade {
         return question;
     }
 
+    /**
+     * Importa una pregunta externa asignándole el autor ANTES de persistirla,
+     * para que quede visible en la lista del autor.
+     */
+    public Pregunta importQuestion(QuestionProvider provider, int autorId) {
+        Pregunta question = importer.importQuestion(provider);
+        question.setAutorId(autorId);
+        createQuestion(question);
+        return question;
+    }
+
     public Pregunta importDefaultExternalQuestion() {
         return importQuestion(new ExternalQuestionAdapter(new ExternalQuestionService()));
+    }
+
+    public Pregunta importDefaultExternalQuestion(int autorId) {
+        return importQuestion(new ExternalQuestionAdapter(new ExternalQuestionService()), autorId);
     }
 
     // -------------------------------------------------------------------------
