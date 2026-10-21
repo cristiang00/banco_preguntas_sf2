@@ -1,7 +1,7 @@
 package com.unicauca.taller2.usuarios.model;
 
 /**
- * Enum que representa el estado de un usuario en el sistema.
+ * Enum que representa el estado de un usuario en el sistema. ademas permite obtener el nombre para mostrar del estado.
  */
 public enum EstadoUsuario {
 
