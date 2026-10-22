@@ -25,6 +25,7 @@ public class AsignacionRevisorController {
         asignacionService.asignarRevisores(preguntaId, revisorIds);
     }
 
+    // HU 4 - CA 2: Dado que accedo al listado de preguntas para asignar revisor, el sistema solo muestra las preguntas en estado "Pendiente de revisión"; las preguntas en otros estados no aparecen en el listado
     public List<Pregunta> listarPreguntasPendientes() {
         return preguntaRepository.listarPorEstado(EstadoPregunta.PENDIENTE_REVISION, 0, 1000);
     }

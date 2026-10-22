@@ -70,6 +70,7 @@ public class AsignacionRevisorService {
                     "Solo las preguntas en estado Pendiente de revisión pueden tener revisores asignados");
         }
 
+        // HU 4 - CA 3: Dado que asigno sin seleccionar un revisor, el sistema bloquea la acción, alerta la falta de selección y resalta el campo
         if (revisorIds == null || revisorIds.isEmpty()) {
             throw new IllegalArgumentException("Debe seleccionar al menos un revisor");
         }
@@ -90,6 +91,7 @@ public class AsignacionRevisorService {
         // Asignar y notificar
         boolean primerAsignado = false;
         for (Usuario revisor : revisoresValidados) {
+            // HU 4 - CA 1: Dado que asigno revisores a una pregunta en revisión como administrador, el sistema guarda la asignación y confirma el cambio
             if (!asignacionRepository.existeAsignacion(preguntaId, revisor.getId())) {
                 asignacionRepository.asignar(preguntaId, revisor.getId());
                 primerAsignado = true;

@@ -82,6 +82,7 @@ public class AsignarRevisorPanel extends JPanel {
         add(splitPane, BorderLayout.CENTER);
     }
 
+    // HU 4 - CA 2: Dado que accedo al listado de preguntas para asignar revisor, el sistema solo muestra las preguntas en estado "Pendiente de revisión"; las preguntas en otros estados no aparecen en el listado
     private void cargarPreguntas() {
         List<Pregunta> preguntas = controller.listarPreguntasPendientes();
         modelPreguntas.setRowCount(0);
@@ -107,6 +108,7 @@ public class AsignarRevisorPanel extends JPanel {
         }
 
         List<Usuario> seleccionados = listaRevisores.getSelectedValuesList();
+        // HU 4 - CA 3: Dado que asigno sin seleccionar un revisor, el sistema bloquea la acción, alerta la falta de selección y resalta el campo
         if (seleccionados.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Debe seleccionar al menos un revisor.", "Aviso", JOptionPane.WARNING_MESSAGE);
             return;
@@ -122,6 +124,7 @@ public class AsignarRevisorPanel extends JPanel {
             int confirm = JOptionPane.showConfirmDialog(this, "¿Está seguro de asignar los revisores seleccionados a la pregunta " + p.getId() + "?", "Confirmar", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 controller.asignarRevisores(p.getId(), revisorIds);
+                // HU 4 - CA 1: Dado que asigno revisores a una pregunta en revisión como administrador, el sistema guarda la asignación y confirma el cambio
                 JOptionPane.showMessageDialog(this, "Revisores asignados correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
                 // Recargar preguntas (la pregunta puede haber transitado a EN_REVISION)
                 cargarPreguntas();

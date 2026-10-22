@@ -42,6 +42,7 @@ public class DetallePreguntaDialog extends JDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
 
+        // HU 3 - CA 6: Dado que visualizo una pregunta creada por mí, el sistema muestra su información completa y las acciones disponibles según su estado
         int y = 0;
         String tipoStr = pregunta.getTipo() != null ? pregunta.getTipo().getNombre() : "Selección Única";
         addCampoTexto(infoPanel, gbc, "Tipo de Pregunta:", tipoStr, y++);

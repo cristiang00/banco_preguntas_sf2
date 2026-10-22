@@ -72,6 +72,7 @@ public class ListarPreguntasPanel extends JPanel {
 
         JButton btnFiltrar = new JButton("Filtrar");
         UIUtils.stylizePrimaryButton(btnFiltrar);
+        // HU 3 - CA 5: Dado que aplico una búsqueda o filtros en mi listado sin obtener coincidencias, el sistema muestra un mensaje indicando que no se encontraron preguntas
         btnFiltrar.addActionListener(e -> {
             paginaActual = 1;
             cargarDatos();
@@ -226,6 +227,7 @@ public class ListarPreguntasPanel extends JPanel {
 
         tableModel.setRowCount(0);
 
+        // HU 3 - CA 5: Dado que aplico una búsqueda o filtros en mi listado sin obtener coincidencias, el sistema muestra un mensaje indicando que no se encontraron preguntas
         if (preguntas.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No se ha encontrado ninguna pregunta", "Información",
                     JOptionPane.INFORMATION_MESSAGE);
@@ -283,6 +285,7 @@ public class ListarPreguntasPanel extends JPanel {
         }
     }
 
+    // HU 3 - CA 6: Dado que visualizo una pregunta creada por mí, el sistema muestra su información completa y las acciones disponibles según su estado
     private void cambiarEstado() {
         int row = tabla.getSelectedRow();
         if (row == -1) {
