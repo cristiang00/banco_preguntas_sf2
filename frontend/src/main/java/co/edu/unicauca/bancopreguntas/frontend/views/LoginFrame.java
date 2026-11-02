@@ -52,7 +52,7 @@ public class LoginFrame extends JFrame {
 
         JLabel lblPass = new JLabel("Contraseña:");
         lblPass.setFont(UIUtils.FONT_SUBTITLE);
-        txtPassword = new JPasswordField("Password123!");
+        txtPassword = new JPasswordField("Password123!@");
         UIUtils.stylizeTextField(txtPassword);
 
         lblError = new JLabel("", SwingConstants.CENTER);
