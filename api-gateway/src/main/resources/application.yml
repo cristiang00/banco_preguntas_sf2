@@ -1,0 +1,27 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+gateway:
+  services:
+    users: ${USERS_SERVICE_URL:http://localhost:8081}
+    questions: ${QUESTIONS_SERVICE_URL:http://localhost:8082}
+    validation: ${VALIDATION_SERVICE_URL:http://localhost:8083}
+    lifecycle: ${LIFECYCLE_SERVICE_URL:http://localhost:8084}
+    review: ${REVIEW_SERVICE_URL:http://localhost:8085}
+    notification: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
+    audit: ${AUDIT_SERVICE_URL:http://localhost:8087}
+
+jwt:
+  secret: ${JWT_SECRET:SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
+  expiration-ms: 86400000
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
