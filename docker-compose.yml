@@ -1,0 +1,206 @@
+services:
+  # =========================================================================
+  # Infraestructura de Persistencia y Mensajería
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: saberpro-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saberpro-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: saberpro-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saberpro-network
+
+  # =========================================================================
+  # Microservicios del Bounded Context
+  # =========================================================================
+  users-service:
+    build:
+      context: ./services/users-service
+      dockerfile: Dockerfile
+    container_name: saberpro-users-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/users_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
+  questions-service:
+    build:
+      context: ./services/questions-service
+      dockerfile: Dockerfile
+    container_name: saberpro-questions-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/questions_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      SERVICES_VALIDATION_URL: http://validation-service:8083
+      SERVICES_LIFECYCLE_URL: http://lifecycle-service:8084
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
+  validation-service:
+    build:
+      context: ./services/validation-service
+      dockerfile: Dockerfile
+    container_name: saberpro-validation-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/validation_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      SERVICES_QUESTIONS_URL: http://questions-service:8082
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
+  lifecycle-service:
+    build:
+      context: ./services/lifecycle-service
+      dockerfile: Dockerfile
+    container_name: saberpro-lifecycle-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/lifecycle_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
+  review-service:
+    build:
+      context: ./services/review-service
+      dockerfile: Dockerfile
+    container_name: saberpro-review-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/review_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      SERVICES_USERS_URL: http://users-service:8081
+      SERVICES_QUESTIONS_URL: http://questions-service:8082
+      SERVICES_LIFECYCLE_URL: http://lifecycle-service:8084
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: saberpro-notification-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      NOTIFICATION_EMAIL_PROVIDER: ${NOTIFICATION_EMAIL_PROVIDER:-mock}
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
+  audit-service:
+    build:
+      context: ./services/audit-service
+      dockerfile: Dockerfile
+    container_name: saberpro-audit-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/audit_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
+  # =========================================================================
+  # API Gateway Centralizado
+  # =========================================================================
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: saberpro-api-gateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
+      GATEWAY_SERVICES_USERS: http://users-service:8081
+      GATEWAY_SERVICES_QUESTIONS: http://questions-service:8082
+      GATEWAY_SERVICES_VALIDATION: http://validation-service:8083
+      GATEWAY_SERVICES_LIFECYCLE: http://lifecycle-service:8084
+      GATEWAY_SERVICES_REVIEW: http://review-service:8085
+      GATEWAY_SERVICES_NOTIFICATION: http://notification-service:8086
+      GATEWAY_SERVICES_AUDIT: http://audit-service:8087
+    ports:
+      - "8080:8080"
+    depends_on:
+      - users-service
+      - questions-service
+      - validation-service
+      - lifecycle-service
+      - review-service
+      - notification-service
+      - audit-service
+    networks:
+      - saberpro-network
+
+networks:
+  saberpro-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
