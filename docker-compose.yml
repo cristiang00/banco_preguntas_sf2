@@ -178,13 +178,20 @@ services:
     container_name: saberpro-api-gateway
     environment:
       JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
-      GATEWAY_SERVICES_USERS: http://users-service:8081
-      GATEWAY_SERVICES_QUESTIONS: http://questions-service:8082
-      GATEWAY_SERVICES_VALIDATION: http://validation-service:8083
-      GATEWAY_SERVICES_LIFECYCLE: http://lifecycle-service:8084
-      GATEWAY_SERVICES_REVIEW: http://review-service:8085
-      GATEWAY_SERVICES_NOTIFICATION: http://notification-service:8086
-      GATEWAY_SERVICES_AUDIT: http://audit-service:8087
+      USERS_SERVICE_URL: ${USERS_SERVICE_URL:-http://users-service:8081}
+      QUESTIONS_SERVICE_URL: ${QUESTIONS_SERVICE_URL:-http://questions-service:8082}
+      VALIDATION_SERVICE_URL: ${VALIDATION_SERVICE_URL:-http://validation-service:8083}
+      LIFECYCLE_SERVICE_URL: ${LIFECYCLE_SERVICE_URL:-http://lifecycle-service:8084}
+      REVIEW_SERVICE_URL: ${REVIEW_SERVICE_URL:-http://review-service:8085}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8086}
+      AUDIT_SERVICE_URL: ${AUDIT_SERVICE_URL:-http://audit-service:8087}
+      GATEWAY_SERVICES_USERS: ${USERS_SERVICE_URL:-http://users-service:8081}
+      GATEWAY_SERVICES_QUESTIONS: ${QUESTIONS_SERVICE_URL:-http://questions-service:8082}
+      GATEWAY_SERVICES_VALIDATION: ${VALIDATION_SERVICE_URL:-http://validation-service:8083}
+      GATEWAY_SERVICES_LIFECYCLE: ${LIFECYCLE_SERVICE_URL:-http://lifecycle-service:8084}
+      GATEWAY_SERVICES_REVIEW: ${REVIEW_SERVICE_URL:-http://review-service:8085}
+      GATEWAY_SERVICES_NOTIFICATION: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8086}
+      GATEWAY_SERVICES_AUDIT: ${AUDIT_SERVICE_URL:-http://audit-service:8087}
     ports:
       - "8080:8080"
     depends_on:

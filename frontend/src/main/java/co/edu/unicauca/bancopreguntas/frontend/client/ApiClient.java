@@ -144,7 +144,13 @@ public class ApiClient {
     public EstadoPreguntaDTO enviarARevision(Long id) throws IOException, ApiException {
         HttpResponseData response = sendPut("/preguntas/" + id + "/enviar-revision", "{}", true);
         if (response.getStatusCode() == 200) {
-            return objectMapper.readValue(response.getBody(), EstadoPreguntaDTO.class);
+            try {
+                com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+                if (root.has("estado")) {
+                    return EstadoPreguntaDTO.fromString(root.get("estado").asText());
+                }
+            } catch (Exception ignored) {}
+            return EstadoPreguntaDTO.PENDIENTE_REVISION;
         }
         throw handleApiError(response);
     }

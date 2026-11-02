@@ -48,10 +48,12 @@ class GatewaySecurityAndRoutingTest {
         // Stub RestTemplate que simula respuestas de los microservicios
         RestTemplate stubRestTemplate = new RestTemplate() {
             @Override
-            public <T> ResponseEntity<T> exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType) {
+            public <T> ResponseEntity<T> exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity,
+                    Class<T> responseType) {
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.set(CorrelationFilter.CORRELATION_HEADER, requestEntity.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
+                headers.set(CorrelationFilter.CORRELATION_HEADER,
+                        requestEntity.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
                 byte[] body = "{\"status\":\"ok\",\"mocked\":true}".getBytes(StandardCharsets.UTF_8);
                 return (ResponseEntity<T>) new ResponseEntity<>(body, headers, HttpStatus.OK);
             }
@@ -67,6 +69,18 @@ class GatewaySecurityAndRoutingTest {
         request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-test-1");
 
         ResponseEntity<?> response = controller.routeRequest(HttpMethod.POST, request, "{}".getBytes());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
+    }
+
+    @Test
+    @DisplayName("CORS Preflight: Solicitudes OPTIONS deben permitirse sin token de autorización")
+    void testOptionsMethodIsPublic() {
+        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/v1/preguntas");
+        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-cors-1");
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.OPTIONS, request, null);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
@@ -93,6 +107,14 @@ class GatewaySecurityAndRoutingTest {
         ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("Enrutamiento HU2: /preguntas/{id}/enviar-revision debe enrutar a lifecycle-service")
+    void testRouteEnviarARevisionDirectsToLifecycle() {
+        String target = controller.resolveTargetService("/preguntas/42/enviar-revision");
+        assertEquals(properties.getLifecycle(), target, "El endpoint enviar-revision debe ser dirigido a lifecycle-service");
+
     }
 
     @Test
@@ -137,5 +159,32 @@ class GatewaySecurityAndRoutingTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
-}
 
+    @Test
+    @DisplayName("Control de Roles: Autor intentando consultar /preguntas/pendientes responde 403 Forbidden")
+    void testRoleForbiddenAutorConsultingPendientes() {
+        String tokenAutor = createTestToken(2L, "juan_autor", "AUTOR");
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/pendientes");
+        request.addHeader("Authorization", "Bearer " + tokenAutor);
+        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-pend-1");
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("Control de Roles: Autor intentando crear usuario (POST /usuarios) responde 403 Forbidden")
+    void testRoleForbiddenAutorCreatingUser() {
+        String tokenAutor = createTestToken(2L, "juan_autor", "AUTOR");
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/usuarios");
+        request.addHeader("Authorization", "Bearer " + tokenAutor);
+        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-usr-1");
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.POST, request, "{}".getBytes());
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+}

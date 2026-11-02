@@ -10,13 +10,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.*;
 
 @RestController
@@ -26,6 +29,19 @@ public class GatewayRoutingController {
 
     private static final Logger log = LoggerFactory.getLogger(GatewayRoutingController.class);
 
+    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
+            "connection",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailers",
+            "transfer-encoding",
+            "upgrade",
+            "content-length",
+            "host"
+    );
+
     private final GatewayProperties gatewayProperties;
     private final JwtValidator jwtValidator;
     private final RestTemplate restTemplate;
@@ -34,10 +50,14 @@ public class GatewayRoutingController {
     public GatewayRoutingController(GatewayProperties gatewayProperties, JwtValidator jwtValidator) {
         this.gatewayProperties = gatewayProperties;
         this.jwtValidator = jwtValidator;
-        
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(10000);
+
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(10));
         this.restTemplate = new RestTemplate(factory);
     }
 
@@ -105,13 +125,15 @@ public class GatewayRoutingController {
         if (headerNames != null) {
             while (headerNames.hasMoreElements()) {
                 String name = headerNames.nextElement();
-                if (!name.equalsIgnoreCase("content-length") && !name.equalsIgnoreCase("host")) {
+                String lowerName = name.toLowerCase();
+                // Filtrar cabeceras Hop-by-Hop y cabeceras de identidad no autenticadas
+                if (!HOP_BY_HOP_HEADERS.contains(lowerName) && !lowerName.startsWith("x-user-")) {
                     headers.addAll(name, Collections.list(request.getHeaders(name)));
                 }
             }
         }
 
-        // Inyectar o propagar cabeceras de contexto
+        // Inyectar o propagar cabeceras de contexto seguras
         headers.set(CorrelationFilter.CORRELATION_HEADER, correlationId);
         if (claims != null) {
             Object userId = claims.get("userId");
@@ -122,32 +144,52 @@ public class GatewayRoutingController {
             if (username != null) headers.set("X-User-Name", username);
         }
 
-        // 5. Construir URI de destino
-        String targetUrl = targetServiceBaseUrl + subPath + (query != null ? "?" + query : "");
+        // 5. Construir URI de destino segura tolerante a acentos y caracteres especiales
+        URI targetUri;
+        try {
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(targetServiceBaseUrl).path(subPath);
+            if (query != null && !query.isBlank()) {
+                builder.query(query);
+            }
+            targetUri = builder.build(true).toUri();
+        } catch (Exception e) {
+            targetUri = URI.create(targetServiceBaseUrl + subPath + (query != null && !query.isBlank() ? "?" + query : ""));
+        }
+
         HttpEntity<byte[]> entity = new HttpEntity<>(body, headers);
 
         try {
             ResponseEntity<byte[]> response = restTemplate.exchange(
-                    URI.create(targetUrl),
+                    targetUri,
                     method,
                     entity,
                     byte[].class
             );
 
             HttpHeaders responseHeaders = new HttpHeaders();
-            response.getHeaders().forEach(responseHeaders::addAll);
+            response.getHeaders().forEach((headerName, values) -> {
+                if (!HOP_BY_HOP_HEADERS.contains(headerName.toLowerCase())) {
+                    responseHeaders.addAll(headerName, values);
+                }
+            });
             responseHeaders.set(CorrelationFilter.CORRELATION_HEADER, correlationId);
 
             return new ResponseEntity<>(response.getBody(), responseHeaders, response.getStatusCode());
 
         } catch (HttpStatusCodeException ex) {
             HttpHeaders responseHeaders = new HttpHeaders();
-            ex.getResponseHeaders().forEach(responseHeaders::addAll);
+            if (ex.getResponseHeaders() != null) {
+                ex.getResponseHeaders().forEach((headerName, values) -> {
+                    if (!HOP_BY_HOP_HEADERS.contains(headerName.toLowerCase())) {
+                        responseHeaders.addAll(headerName, values);
+                    }
+                });
+            }
             responseHeaders.set(CorrelationFilter.CORRELATION_HEADER, correlationId);
             return new ResponseEntity<>(ex.getResponseBodyAsByteArray(), responseHeaders, ex.getStatusCode());
 
         } catch (ResourceAccessException ex) {
-            log.error("[Gateway] Timeout o falla de conexión hacia {}: {}", targetUrl, ex.getMessage());
+            log.error("[Gateway] Timeout o falla de conexión hacia {}: {}", targetUri, ex.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .header(CorrelationFilter.CORRELATION_HEADER, correlationId)
                     .body(Map.of(
@@ -156,19 +198,22 @@ public class GatewayRoutingController {
                             "correlationId", correlationId
                     ));
         } catch (Exception ex) {
-            log.error("[Gateway] Error inesperado enrutando a {}: {}", targetUrl, ex.getMessage());
+            log.error("[Gateway] Error inesperado enrutando a {}: {}", targetUri, ex.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .header(CorrelationFilter.CORRELATION_HEADER, correlationId)
                     .body(Map.of(
                             "error", "Falla interna en el API Gateway",
-                            "mensaje", ex.getMessage(),
+                            "mensaje", ex.getMessage() != null ? ex.getMessage() : "Error no identificado",
                             "correlationId", correlationId
                     ));
         }
     }
 
-    private String resolveTargetService(String subPath) {
-        if (subPath.startsWith("/auth") || subPath.startsWith("/usuarios")) {
+    public String resolveTargetService(String subPath) {
+        // HU2: Envío de pregunta a revisión pertenece a Lifecycle Service
+        if (subPath.startsWith("/preguntas/") && subPath.contains("/enviar-revision")) {
+            return gatewayProperties.getLifecycle();
+        } else if (subPath.startsWith("/auth") || subPath.startsWith("/usuarios")) {
             return gatewayProperties.getUsers();
         } else if (subPath.startsWith("/preguntas") || subPath.startsWith("/catalogos")) {
             return gatewayProperties.getQuestions();
@@ -187,6 +232,10 @@ public class GatewayRoutingController {
     }
 
     private boolean isPublicEndpoint(String subPath, HttpMethod method) {
+        // Las solicitudes de preflight CORS (OPTIONS) deben permitirse siempre sin token
+        if (method == HttpMethod.OPTIONS) {
+            return true;
+        }
         if (subPath.startsWith("/auth/login") || subPath.startsWith("/auth/token")) {
             return true;
         }
@@ -204,10 +253,21 @@ public class GatewayRoutingController {
         }
 
         // HU4: Asignación de revisores y consulta de preguntas pendientes de asignación -> Solo ADMINISTRADOR
-        if (subPath.startsWith("/revisiones/asignar") || subPath.startsWith("/revisiones/pendientes")) {
+        if (subPath.startsWith("/revisiones/asignar") || 
+            subPath.startsWith("/revisiones/pendientes") || 
+            subPath.equals("/preguntas/pendientes") || 
+            subPath.startsWith("/preguntas/pendientes?")) {
             if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("error", "Acceso denegado: solo ADMINISTRADOR puede gestionar asignaciones"));
+            }
+        }
+
+        // Registro de nuevos usuarios -> Solo ADMINISTRADOR
+        if (subPath.startsWith("/usuarios") && method == HttpMethod.POST) {
+            if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Acceso denegado: solo ADMINISTRADOR puede registrar nuevos usuarios"));
             }
         }
 
@@ -220,6 +280,14 @@ public class GatewayRoutingController {
             }
         }
 
+        // Control para evitar auto-aprobación o alteración directa en Ciclo de Vida
+        if (subPath.startsWith("/ciclo-vida") && (subPath.contains("/decision") || subPath.contains("/inicializar"))) {
+            if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Acceso denegado: endpoint de sincronización interna"));
+            }
+        }
+
         // Auditoría global -> Solo ADMINISTRADOR
         if (subPath.startsWith("/auditoria")) {
             if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
@@ -228,7 +296,7 @@ public class GatewayRoutingController {
             }
         }
 
-        // Creación y edición de preguntas -> Solo AUTOR (o Administrador en caso especial)
+        // Creación y edición de preguntas o envío a revisión -> Solo AUTOR (o Administrador)
         if (subPath.startsWith("/preguntas") && (method == HttpMethod.POST || method == HttpMethod.PUT)) {
             if (!"AUTOR".equalsIgnoreCase(role) && !"ADMINISTRADOR".equalsIgnoreCase(role)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -239,4 +307,3 @@ public class GatewayRoutingController {
         return null; // Autorizado
     }
 }
-
