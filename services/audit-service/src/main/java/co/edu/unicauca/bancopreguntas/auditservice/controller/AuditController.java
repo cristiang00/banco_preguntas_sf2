@@ -23,7 +23,7 @@ public class AuditController {
     @GetMapping
     @Operation(summary = "Listar eventos auditados", description = "Obtiene la bitácora global de eventos ordenada cronológicamente")
     public ResponseEntity<List<RegistroAuditoriaEntity>> listarAuditoria(
-            @RequestParam(required = false) String eventType) {
+            @RequestParam(value = "eventType", required = false) String eventType) {
         if (eventType != null && !eventType.isBlank()) {
             return ResponseEntity.ok(auditService.listarPorTipoEvento(eventType));
         }
@@ -32,13 +32,13 @@ public class AuditController {
 
     @GetMapping("/pregunta/{id}")
     @Operation(summary = "Historial de auditoría por pregunta", description = "Recupera la trazabilidad completa de cambios de estado y decisiones sobre una pregunta")
-    public ResponseEntity<List<RegistroAuditoriaEntity>> listarPorPregunta(@PathVariable Long id) {
+    public ResponseEntity<List<RegistroAuditoriaEntity>> listarPorPregunta(@PathVariable(value = "id") Long id) {
         return ResponseEntity.ok(auditService.listarPorPregunta(id));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Consultar registro de auditoría específico por ID")
-    public ResponseEntity<RegistroAuditoriaEntity> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<RegistroAuditoriaEntity> buscarPorId(@PathVariable(value = "id") Long id) {
         return auditService.buscarPorId(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

@@ -26,6 +26,7 @@ public class QuestionsServiceClient {
     private final RestTemplate restTemplate;
     private final String questionsServiceUrl;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public QuestionsServiceClient(RestTemplateBuilder builder,
                                   @Value("${services.questions.url:http://localhost:8082}") String questionsServiceUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

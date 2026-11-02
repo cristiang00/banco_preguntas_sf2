@@ -56,10 +56,10 @@ public class QuestionController {
         @ApiResponse(responseCode = "200", description = "Listado de preguntas obtenido exitosamente")
     })
     public ResponseEntity<Map<String, Object>> listarPreguntas(
-            @RequestParam(required = false) List<String> estados,
-            @RequestParam(required = false, defaultValue = "TODOS") String dificultad,
-            @RequestParam(required = false, defaultValue = "0") int page,
-            @RequestParam(required = false, defaultValue = "10") int size,
+            @RequestParam(value = "estados", required = false) List<String> estados,
+            @RequestParam(value = "dificultad", required = false, defaultValue = "TODOS") String dificultad,
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "10") int size,
             @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
             @RequestHeader(value = "X-User-Role", defaultValue = "AUTOR") String userRole) {
 
@@ -92,7 +92,7 @@ public class QuestionController {
         @ApiResponse(responseCode = "404", description = "Pregunta no encontrada")
     })
     public ResponseEntity<?> consultarDetalle(
-            @PathVariable Long id,
+            @PathVariable(value = "id") Long id,
             @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
             @RequestHeader(value = "X-User-Role", defaultValue = "AUTOR") String userRole) {
         try {
@@ -114,7 +114,7 @@ public class QuestionController {
         @ApiResponse(responseCode = "409", description = "No se puede editar una pregunta fuera de Borrador")
     })
     public ResponseEntity<?> editarBorrador(
-            @PathVariable Long id,
+            @PathVariable(value = "id") Long id,
             @RequestBody PreguntaDTO dto,
             @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId) {
         try {
@@ -140,8 +140,8 @@ public class QuestionController {
     @PutMapping("/{id}/proyeccion-estado")
     @Operation(summary = "Sincronizar proyección local de estado desde eventos de ciclo de vida")
     public ResponseEntity<?> actualizarProyeccion(
-            @PathVariable Long id,
-            @RequestParam String estado) {
+            @PathVariable(value = "id") Long id,
+            @RequestParam(value = "estado") String estado) {
         questionService.actualizarProyeccionEstado(id, EstadoPreguntaDTO.fromString(estado));
         return ResponseEntity.ok(Map.of("preguntaId", id, "estado", estado));
     }

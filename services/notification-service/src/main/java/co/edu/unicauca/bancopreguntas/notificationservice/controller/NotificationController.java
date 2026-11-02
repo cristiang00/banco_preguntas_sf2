@@ -23,7 +23,7 @@ public class NotificationController {
     @GetMapping
     @Operation(summary = "Listar notificaciones registradas", description = "Permite filtrar por destinatario o listar todo el historial")
     public ResponseEntity<List<NotificacionEntity>> listarNotificaciones(
-            @RequestParam(required = false) String destinatario) {
+            @RequestParam(value = "destinatario", required = false) String destinatario) {
         if (destinatario != null && !destinatario.isBlank()) {
             return ResponseEntity.ok(notificacionService.listarPorDestinatario(destinatario));
         }
@@ -32,7 +32,7 @@ public class NotificationController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Consultar notificación por ID")
-    public ResponseEntity<NotificacionEntity> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<NotificacionEntity> buscarPorId(@PathVariable(value = "id") Long id) {
         return notificacionService.buscarPorId(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

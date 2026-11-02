@@ -22,6 +22,7 @@ public class ValidationServiceClient {
     private final RestTemplate restTemplate;
     private final String validationServiceUrl;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public ValidationServiceClient(RestTemplateBuilder builder,
                                    @Value("${services.validation.url:http://localhost:8083}") String validationServiceUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

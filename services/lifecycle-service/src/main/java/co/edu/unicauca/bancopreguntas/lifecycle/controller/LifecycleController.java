@@ -33,7 +33,7 @@ public class LifecycleController {
         @ApiResponse(responseCode = "409", description = "Transición inválida: la pregunta no está en Borrador")
     })
     public ResponseEntity<?> enviarARevision(
-            @PathVariable Long id,
+            @PathVariable(value = "id") Long id,
             @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
             @RequestHeader(value = "X-User-Name", defaultValue = "Autor") String userName,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
@@ -64,7 +64,7 @@ public class LifecycleController {
 
     @GetMapping("/ciclo-vida/preguntas/{id}/estado")
     @Operation(summary = "Consultar estado actual y color de una pregunta (HU2 - SSCRUM-44)")
-    public ResponseEntity<?> obtenerEstado(@PathVariable Long id) {
+    public ResponseEntity<?> obtenerEstado(@PathVariable(value = "id") Long id) {
         EstadoPreguntaDTO estado = lifecycleService.obtenerEstado(id);
         return ResponseEntity.ok(Map.of(
                 "preguntaId", id,
@@ -76,7 +76,7 @@ public class LifecycleController {
 
     @GetMapping("/ciclo-vida/preguntas/{id}/puede-editar")
     @Operation(summary = "Verificar si la pregunta puede ser editada (HU2 - SSCRUM-46)")
-    public ResponseEntity<?> puedeEditar(@PathVariable Long id) {
+    public ResponseEntity<?> puedeEditar(@PathVariable(value = "id") Long id) {
         boolean editable = lifecycleService.puedeEditar(id);
         return ResponseEntity.ok(Map.of(
                 "preguntaId", id,
@@ -87,8 +87,8 @@ public class LifecycleController {
     @PostMapping("/ciclo-vida/preguntas/{id}/inicializar")
     @Operation(summary = "Inicializar ciclo de vida de una nueva pregunta en Borrador")
     public ResponseEntity<?> inicializarPregunta(
-            @PathVariable Long id,
-            @RequestParam Long autorId) {
+            @PathVariable(value = "id") Long id,
+            @RequestParam(value = "autorId") Long autorId) {
         lifecycleService.registrarPreguntaInicial(id, autorId);
         return ResponseEntity.ok(Map.of("preguntaId", id, "estado", EstadoPreguntaDTO.BORRADOR.name()));
     }
@@ -96,7 +96,7 @@ public class LifecycleController {
     @PutMapping("/ciclo-vida/preguntas/{id}/decision")
     @Operation(summary = "Aplicar decisión de revisores (Aprobada / Rechazada) coordinada desde Review Service")
     public ResponseEntity<?> aplicarDecision(
-            @PathVariable Long id,
+            @PathVariable(value = "id") Long id,
             @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
             @RequestBody Map<String, Object> body) {

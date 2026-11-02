@@ -76,10 +76,10 @@ public class ReviewController {
     public ResponseEntity<?> listarAsignadas(
             @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId,
             @RequestHeader(value = "X-User-Role", defaultValue = "REVISOR") String userRole,
-            @RequestParam(required = false, defaultValue = "0") int page,
-            @RequestParam(required = false, defaultValue = "10") int size,
-            @RequestParam(required = false) String dificultad,
-            @RequestParam(required = false) String competencia) {
+            @RequestParam(value = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(value = "size", required = false, defaultValue = "10") int size,
+            @RequestParam(value = "dificultad", required = false) String dificultad,
+            @RequestParam(value = "competencia", required = false) String competencia) {
         if (!"REVISOR".equalsIgnoreCase(userRole)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Acceso exclusivo para usuarios con rol Revisor"));
         }
@@ -94,7 +94,7 @@ public class ReviewController {
         @ApiResponse(responseCode = "409", description = "La revisión ya fue finalizada")
     })
     public ResponseEntity<?> registrarEvaluacion(
-            @PathVariable Long id,
+            @PathVariable(value = "id") Long id,
             @RequestBody EvaluacionRequestDTO request,
             @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId) {
         try {
@@ -118,7 +118,7 @@ public class ReviewController {
         @ApiResponse(responseCode = "409", description = "La revisión ya fue decidida previamente")
     })
     public ResponseEntity<?> registrarDecision(
-            @PathVariable Long id,
+            @PathVariable(value = "id") Long id,
             @RequestBody DecisionRequestDTO request,
             @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
@@ -140,7 +140,7 @@ public class ReviewController {
 
     @GetMapping("/pregunta/{preguntaId}/observaciones")
     @Operation(summary = "Consultar observaciones de revisores visibles para el autor")
-    public ResponseEntity<List<ObservacionEntity>> listarObservaciones(@PathVariable Long preguntaId) {
+    public ResponseEntity<List<ObservacionEntity>> listarObservaciones(@PathVariable(value = "preguntaId") Long preguntaId) {
         return ResponseEntity.ok(reviewService.listarObservaciones(preguntaId));
     }
 }

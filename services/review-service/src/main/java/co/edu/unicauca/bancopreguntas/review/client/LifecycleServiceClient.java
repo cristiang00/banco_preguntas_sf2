@@ -25,6 +25,7 @@ public class LifecycleServiceClient {
     private final RestTemplate restTemplate;
     private final String lifecycleServiceUrl;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public LifecycleServiceClient(RestTemplateBuilder builder,
                                   @Value("${services.lifecycle.url:http://localhost:8084}") String lifecycleServiceUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
