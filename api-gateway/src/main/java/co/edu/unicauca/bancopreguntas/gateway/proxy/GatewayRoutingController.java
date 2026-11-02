@@ -30,6 +30,7 @@ public class GatewayRoutingController {
     private final JwtValidator jwtValidator;
     private final RestTemplate restTemplate;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public GatewayRoutingController(GatewayProperties gatewayProperties, JwtValidator jwtValidator) {
         this.gatewayProperties = gatewayProperties;
         this.jwtValidator = jwtValidator;

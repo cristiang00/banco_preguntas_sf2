@@ -5,6 +5,7 @@ param(
     [switch]$Docker,
     [switch]$FrontendOnly,
     [switch]$NoFrontend,
+    [switch]$Console,
     [switch]$Build,
     [switch]$Stop
 )
@@ -64,7 +65,7 @@ Write-Host "==========================================================" -Foregro
 if ($Docker) {
     Write-Host "[1/2] Levantando contenedores con Docker Compose..." -ForegroundColor Yellow
     docker compose up --build -d
-    Write-Host "[2/2] Esperando inicialización de servicios (15s)..." -ForegroundColor Yellow
+    Write-Host "[2/2] Esperando inicializacion de servicios (15s)..." -ForegroundColor Yellow
     Start-Sleep -Seconds 15
     Write-Host "Servicios disponibles en Docker:" -ForegroundColor Green
     Write-Host " - API Gateway: http://localhost:8080" -ForegroundColor White
@@ -114,27 +115,36 @@ if (-not $needsBuild) {
 }
 
 if ($needsBuild) {
-    Write-Host "[1/3] Compilando y empaquetando módulos con Maven..." -ForegroundColor Yellow
+    Write-Host "[1/3] Compilando y empaquetando modulos con Maven..." -ForegroundColor Yellow
     & "$PSScriptRoot\mvnw.cmd" package -DskipTests
 } else {
     Write-Host "[1/3] Artefactos JAR verificados en target/." -ForegroundColor Green
 }
 
-Write-Host "[2/3] Levantando microservicios en segundo plano..." -ForegroundColor Yellow
+$logsDir = Join-Path $PSScriptRoot "logs"
+if (-not (Test-Path $logsDir)) {
+    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+}
+
+Write-Host "[2/3] Levantando microservicios..." -ForegroundColor Yellow
 
 foreach ($s in $services) {
     $isOpen = Test-PortOpen "localhost" $s.Port
     if ($isOpen) {
-        Write-Host " [✓] $($s.Name) ya se encuentra activo en el puerto $($s.Port)." -ForegroundColor DarkGray
+        Write-Host " [OK] $($s.Name) ya activo en puerto $($s.Port)." -ForegroundColor DarkGray
     } else {
-        Write-Host " [→] Iniciando $($s.Name) en puerto $($s.Port)..." -ForegroundColor White
-        $jarPath = $s.Jar
-        $procArgs = "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle = '$($s.Name) [$($s.Port)]'; java -jar `"$jarPath`""
-        Start-Process powershell -ArgumentList $procArgs -WindowStyle Minimized
+        Write-Host " [->] Iniciando $($s.Name) en puerto $($s.Port)..." -ForegroundColor White
+        $outLog = Join-Path $logsDir "$($s.Name).log"
+        $errLog = Join-Path $logsDir "$($s.Name)-err.log"
+        if ($Console) {
+            Start-Process cmd.exe -ArgumentList @("/k", "title $($s.Name) [$($s.Port)] & java -jar `"$($s.Jar)`"")
+        } else {
+            Start-Process -FilePath "java" -ArgumentList @("-jar", $s.Jar) -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+        }
     }
 }
 
-Write-Host "[3/3] Verificando disponibilidad de servicios..." -ForegroundColor Yellow
+Write-Host "[3/3] Verificando disponibilidad de servicios (logs en $logsDir)..." -ForegroundColor Yellow
 $timeoutSeconds = 25
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 $gatewayReady = $false
@@ -150,9 +160,9 @@ while ($stopwatch.Elapsed.TotalSeconds -lt $timeoutSeconds) {
 Write-Host ""
 
 if ($gatewayReady) {
-    Write-Host "✓ API Gateway activo y respondiendo en el puerto 8080." -ForegroundColor Green
+    Write-Host "[OK] API Gateway activo y respondiendo en el puerto 8080." -ForegroundColor Green
 } else {
-    Write-Host "! Advertencia: Los servicios aún se están estabilizando en segundo plano." -ForegroundColor Yellow
+    Write-Host "[INFO] Los servicios estan iniciando en segundo plano. Consulte la carpeta 'logs' para mas detalle." -ForegroundColor Yellow
 }
 
 Write-Host ""
@@ -168,6 +178,7 @@ Write-Host " - Review Service:       http://localhost:8085" -ForegroundColor Whi
 Write-Host " - Notification Service: http://localhost:8086" -ForegroundColor White
 Write-Host " - Audit Service:        http://localhost:8087" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "Para detener todos los servicios ejecute: .\stop-all.ps1" -ForegroundColor DarkGray
 Write-Host ""
 
 if (-not $NoFrontend) {

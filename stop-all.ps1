@@ -43,3 +43,4 @@ if (-not $stoppedAny) {
 } else {
     Write-Host "Todos los microservicios han sido detenidos exitosamente." -ForegroundColor Green
 }
+
