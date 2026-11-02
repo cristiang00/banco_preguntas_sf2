@@ -70,3 +70,4 @@ public class RevisionEntity {
     public LocalDateTime getFechaDecision() { return fechaDecision; }
     public void setFechaDecision(LocalDateTime fechaDecision) { this.fechaDecision = fechaDecision; }
 }
+

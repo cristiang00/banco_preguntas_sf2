@@ -18,3 +18,4 @@ public class ApprovedState extends AbstractQuestionState {
         return EstadoPreguntaDTO.APROBADA;
     }
 }
+

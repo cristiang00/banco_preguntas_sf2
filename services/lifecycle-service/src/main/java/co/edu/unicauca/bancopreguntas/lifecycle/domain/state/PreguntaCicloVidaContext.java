@@ -10,3 +10,4 @@ public interface PreguntaCicloVidaContext {
     Long getPreguntaId();
     Long getAutorId();
 }
+

@@ -70,3 +70,4 @@ public class PreguntaCicloVidaEntity implements PreguntaCicloVidaContext {
         this.fechaActualizacion = fechaActualizacion;
     }
 }
+

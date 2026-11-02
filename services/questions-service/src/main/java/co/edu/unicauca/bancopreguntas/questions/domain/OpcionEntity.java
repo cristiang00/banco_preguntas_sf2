@@ -39,3 +39,4 @@ public class OpcionEntity {
     public int getOrden() { return orden; }
     public void setOrden(int orden) { this.orden = orden; }
 }
+

@@ -28,3 +28,4 @@ public class PendingReviewState extends AbstractQuestionState {
         return EstadoPreguntaDTO.PENDIENTE_REVISION;
     }
 }
+

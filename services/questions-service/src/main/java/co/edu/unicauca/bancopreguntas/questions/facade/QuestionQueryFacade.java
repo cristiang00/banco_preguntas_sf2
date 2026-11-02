@@ -146,3 +146,4 @@ public class QuestionQueryFacade {
         dto.setAccionesPermitidas(acciones);
     }
 }
+

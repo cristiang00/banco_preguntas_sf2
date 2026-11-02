@@ -28,3 +28,4 @@ public class ApiException extends Exception {
         return erroresValidacion;
     }
 }
+

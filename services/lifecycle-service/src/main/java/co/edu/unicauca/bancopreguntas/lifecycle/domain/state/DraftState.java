@@ -33,3 +33,4 @@ public class DraftState extends AbstractQuestionState {
         return EstadoPreguntaDTO.BORRADOR;
     }
 }
+

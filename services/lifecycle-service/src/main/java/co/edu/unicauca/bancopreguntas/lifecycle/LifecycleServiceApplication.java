@@ -18,3 +18,4 @@ public class LifecycleServiceApplication {
         SpringApplication.run(LifecycleServiceApplication.class, args);
     }
 }
+

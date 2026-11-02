@@ -18,3 +18,4 @@ public class AprobacionNotificacionFactory implements NotificacionFactory {
         return "PREGUNTA_APROBADA";
     }
 }
+

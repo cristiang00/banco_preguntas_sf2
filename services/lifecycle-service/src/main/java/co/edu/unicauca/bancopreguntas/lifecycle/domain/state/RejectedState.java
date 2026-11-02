@@ -18,3 +18,4 @@ public class RejectedState extends AbstractQuestionState {
         return EstadoPreguntaDTO.RECHAZADA;
     }
 }
+

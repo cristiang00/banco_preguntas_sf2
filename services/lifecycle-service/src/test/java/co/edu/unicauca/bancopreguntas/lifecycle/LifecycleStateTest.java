@@ -190,3 +190,4 @@ class LifecycleStateTest {
         assertEquals("Rechazada", EstadoPreguntaDTO.RECHAZADA.getLabel());
     }
 }
+

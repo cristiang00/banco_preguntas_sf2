@@ -36,3 +36,4 @@ public class NotificacionAprobacion implements Notificacion {
         return "PREGUNTA_APROBADA";
     }
 }
+

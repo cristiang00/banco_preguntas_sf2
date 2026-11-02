@@ -146,3 +146,4 @@ public class QuestionController {
         return ResponseEntity.ok(Map.of("preguntaId", id, "estado", estado));
     }
 }
+

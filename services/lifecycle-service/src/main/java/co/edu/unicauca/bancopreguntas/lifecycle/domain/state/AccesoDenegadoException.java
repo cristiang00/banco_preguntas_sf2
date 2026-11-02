@@ -9,3 +9,4 @@ public class AccesoDenegadoException extends SecurityException {
         super(message);
     }
 }
+

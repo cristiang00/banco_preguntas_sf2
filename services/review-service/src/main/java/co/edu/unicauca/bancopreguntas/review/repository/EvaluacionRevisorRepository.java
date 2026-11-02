@@ -10,3 +10,4 @@ import java.util.List;
 public interface EvaluacionRevisorRepository extends JpaRepository<EvaluacionRevisorEntity, Long> {
     List<EvaluacionRevisorEntity> findByRevisionId(Long revisionId);
 }
+

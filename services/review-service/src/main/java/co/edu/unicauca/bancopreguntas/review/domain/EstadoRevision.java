@@ -11,3 +11,4 @@ public enum EstadoRevision {
         return this == APROBADA || this == RECHAZADA || this == CERRADA_POR_RECHAZO;
     }
 }
+

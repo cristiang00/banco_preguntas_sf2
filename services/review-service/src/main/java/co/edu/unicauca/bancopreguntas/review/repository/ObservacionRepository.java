@@ -11,3 +11,4 @@ public interface ObservacionRepository extends JpaRepository<ObservacionEntity, 
     List<ObservacionEntity> findByRevisionId(Long revisionId);
     List<ObservacionEntity> findByPreguntaIdAndVisibleAutorTrue(Long preguntaId);
 }
+

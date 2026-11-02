@@ -10,3 +10,4 @@ import java.util.List;
 public interface HistorialTransicionRepository extends JpaRepository<HistorialTransicionEntity, Long> {
     List<HistorialTransicionEntity> findByPreguntaIdOrderByFechaTransicionAsc(Long preguntaId);
 }
+

@@ -36,3 +36,4 @@ public abstract class AbstractQuestionState implements QuestionState {
         return false;
     }
 }
+

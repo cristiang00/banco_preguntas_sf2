@@ -138,3 +138,4 @@ class GatewaySecurityAndRoutingTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
 }
+

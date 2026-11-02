@@ -40,3 +40,4 @@ public class SmtpEmailAdapter implements EmailSender {
         return "SMTP (" + host + ":" + port + ")";
     }
 }
+

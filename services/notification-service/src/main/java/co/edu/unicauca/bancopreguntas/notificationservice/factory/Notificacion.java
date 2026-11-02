@@ -9,3 +9,4 @@ public interface Notificacion {
     String getCuerpo();
     String getTipo();
 }
+

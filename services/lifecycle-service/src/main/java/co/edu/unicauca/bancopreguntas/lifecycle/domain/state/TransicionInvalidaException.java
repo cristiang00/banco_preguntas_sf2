@@ -9,3 +9,4 @@ public class TransicionInvalidaException extends IllegalStateException {
         super(message);
     }
 }
+

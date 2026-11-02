@@ -238,3 +238,4 @@ public class GatewayRoutingController {
         return null; // Autorizado
     }
 }
+

@@ -39,3 +39,4 @@ public class CatalogController {
         return ResponseEntity.ok(catalogService.listarSubtemas());
     }
 }
+

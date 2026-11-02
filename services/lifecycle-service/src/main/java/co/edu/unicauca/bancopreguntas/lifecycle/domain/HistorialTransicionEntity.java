@@ -52,3 +52,4 @@ public class HistorialTransicionEntity {
     public String getMotivo() { return motivo; }
     public LocalDateTime getFechaTransicion() { return fechaTransicion; }
 }
+

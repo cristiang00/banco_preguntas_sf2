@@ -44,3 +44,4 @@ public class AuditObserver implements DomainObserver {
         return "*"; // Observa todos los eventos de dominio
     }
 }
+

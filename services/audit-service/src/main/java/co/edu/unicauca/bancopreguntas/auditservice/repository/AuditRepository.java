@@ -17,3 +17,4 @@ public interface AuditRepository extends JpaRepository<RegistroAuditoriaEntity, 
 
     List<RegistroAuditoriaEntity> findAllByOrderByFechaRegistroDesc();
 }
+

@@ -2,6 +2,8 @@
 # Script de Ejecución de Pruebas Automatizadas
 # =========================================================================
 
+Set-Location $PSScriptRoot
+
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "Ejecutando Suite de Pruebas Automatizadas (JUnit 5)" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -38,3 +40,4 @@ if ($exitCode -eq 0) {
 }
 
 exit $exitCode
+

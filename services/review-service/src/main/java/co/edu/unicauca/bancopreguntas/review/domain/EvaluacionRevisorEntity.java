@@ -43,3 +43,4 @@ public class EvaluacionRevisorEntity {
     public String getComentario() { return comentario; }
     public LocalDateTime getFechaEvaluacion() { return fechaEvaluacion; }
 }
+

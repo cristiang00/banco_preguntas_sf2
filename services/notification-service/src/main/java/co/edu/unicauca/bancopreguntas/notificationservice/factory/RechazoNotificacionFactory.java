@@ -18,3 +18,4 @@ public class RechazoNotificacionFactory implements NotificacionFactory {
         return "PREGUNTA_RECHAZADA";
     }
 }
+

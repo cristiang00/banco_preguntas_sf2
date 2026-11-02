@@ -18,3 +18,4 @@ public interface PreguntaRepository extends JpaRepository<PreguntaEntity, Long>,
 
     List<PreguntaEntity> findByEstadoProyeccion(EstadoPreguntaDTO estado);
 }
+

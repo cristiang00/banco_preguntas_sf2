@@ -44,3 +44,4 @@ public class AuditController {
                 .orElse(ResponseEntity.notFound().build());
     }
 }
+

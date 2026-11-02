@@ -10,3 +10,4 @@ public class EmailDeliveryException extends Exception {
         super(message, cause);
     }
 }
+

@@ -47,3 +47,4 @@ public class NotificacionItemDTO {
     public String getFechaEnvio() { return fechaEnvio; }
     public void setFechaEnvio(String fechaEnvio) { this.fechaEnvio = fechaEnvio; }
 }
+

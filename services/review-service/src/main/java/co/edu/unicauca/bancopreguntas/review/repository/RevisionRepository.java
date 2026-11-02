@@ -23,3 +23,4 @@ public interface RevisionRepository extends JpaRepository<RevisionEntity, Long> 
 
     boolean existsByPreguntaIdAndRevisorId(Long preguntaId, Long revisorId);
 }
+

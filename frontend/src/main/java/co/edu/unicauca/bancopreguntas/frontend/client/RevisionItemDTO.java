@@ -35,3 +35,4 @@ public class RevisionItemDTO {
     public String getFechaAsignacion() { return fechaAsignacion; }
     public void setFechaAsignacion(String fechaAsignacion) { this.fechaAsignacion = fechaAsignacion; }
 }
+

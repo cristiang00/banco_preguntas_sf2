@@ -7,6 +7,8 @@ param(
     [int]$Concurrency = 5
 )
 
+Set-Location $PSScriptRoot
+
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "Prueba de Carga: Banco de Preguntas Saber Pro (Gateway)" -ForegroundColor Cyan
 Write-Host "Destino: $GatewayUrl" -ForegroundColor White
@@ -55,3 +57,4 @@ if ($times.Count -gt 0) {
     Write-Host " Throughput (RPS):  $throughput req/s" -ForegroundColor Cyan
 }
 Write-Host "==========================================================" -ForegroundColor Cyan
+

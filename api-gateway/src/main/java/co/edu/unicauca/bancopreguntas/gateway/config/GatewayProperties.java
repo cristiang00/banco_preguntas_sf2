@@ -36,3 +36,4 @@ public class GatewayProperties {
     public String getAudit() { return audit; }
     public void setAudit(String audit) { this.audit = audit; }
 }
+

@@ -15,3 +15,4 @@ public interface NotificacionRepository extends JpaRepository<NotificacionEntity
 
     List<NotificacionEntity> findAllByOrderByFechaCreacionDesc();
 }
+

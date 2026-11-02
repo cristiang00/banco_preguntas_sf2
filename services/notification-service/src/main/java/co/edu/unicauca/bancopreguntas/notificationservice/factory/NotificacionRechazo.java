@@ -37,3 +37,4 @@ public class NotificacionRechazo implements Notificacion {
         return "PREGUNTA_RECHAZADA";
     }
 }
+

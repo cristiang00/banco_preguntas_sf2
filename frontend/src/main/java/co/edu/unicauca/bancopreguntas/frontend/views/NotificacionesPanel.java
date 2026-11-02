@@ -71,3 +71,4 @@ public class NotificacionesPanel extends JPanel {
         });
     }
 }
+

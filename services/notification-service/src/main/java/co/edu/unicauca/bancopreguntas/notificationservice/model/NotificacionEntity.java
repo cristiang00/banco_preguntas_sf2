@@ -99,3 +99,4 @@ public class NotificacionEntity {
     public String getErrorDetalle() { return errorDetalle; }
     public void setErrorDetalle(String errorDetalle) { this.errorDetalle = errorDetalle; }
 }
+

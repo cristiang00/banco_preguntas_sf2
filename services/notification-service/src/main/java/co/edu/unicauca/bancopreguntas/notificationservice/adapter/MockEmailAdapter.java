@@ -68,3 +68,4 @@ public class MockEmailAdapter implements EmailSender {
         this.simulateFailure = simulateFailure;
     }
 }
+

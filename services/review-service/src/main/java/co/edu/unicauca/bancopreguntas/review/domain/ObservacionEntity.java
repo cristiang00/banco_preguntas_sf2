@@ -43,3 +43,4 @@ public class ObservacionEntity {
     public LocalDateTime getFecha() { return fecha; }
     public boolean isVisibleAutor() { return visibleAutor; }
 }
+

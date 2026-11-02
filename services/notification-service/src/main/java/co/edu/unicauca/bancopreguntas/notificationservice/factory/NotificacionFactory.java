@@ -18,3 +18,4 @@ public interface NotificacionFactory {
 
     String getTipoSoportado();
 }
+

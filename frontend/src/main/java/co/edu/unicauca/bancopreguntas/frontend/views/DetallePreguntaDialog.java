@@ -30,7 +30,8 @@ public class DetallePreguntaDialog extends JDialog {
         mainPanel.setBackground(UIUtils.COLOR_SURFACE);
 
         String estadoLabel = pregunta.getEstado() != null ? pregunta.getEstado() : "BORRADOR";
-        JLabel lblTitulo = new JLabel("Pregunta #" + pregunta.getId() + " - [" + estadoLabel + "]", SwingConstants.CENTER);
+        JLabel lblTitulo = new JLabel("Pregunta #" + pregunta.getId() + " - [" + estadoLabel + "]",
+                SwingConstants.CENTER);
         lblTitulo.setFont(UIUtils.FONT_TITLE);
         lblTitulo.setForeground(UIUtils.COLOR_PRIMARY);
         mainPanel.add(lblTitulo, BorderLayout.NORTH);
@@ -50,7 +51,8 @@ public class DetallePreguntaDialog extends JDialog {
         StringBuilder sbOpciones = new StringBuilder();
         if (pregunta.getOpciones() != null && !pregunta.getOpciones().isEmpty()) {
             for (OpcionDTO op : pregunta.getOpciones()) {
-                boolean esCorrecta = op.getClave() != null && op.getClave().equalsIgnoreCase(pregunta.getRespuestaCorrecta());
+                boolean esCorrecta = op.getClave() != null
+                        && op.getClave().equalsIgnoreCase(pregunta.getRespuestaCorrecta());
                 sbOpciones.append(op.getClave()).append(") ").append(op.getTexto())
                         .append(esCorrecta ? " [CORRECTA]" : "").append("\n");
             }
@@ -62,14 +64,16 @@ public class DetallePreguntaDialog extends JDialog {
         addCampo(infoPanel, gbc, y++, "Competencia:", pregunta.getCompetencia());
         addCampo(infoPanel, gbc, y++, "Tema / Subtema:", pregunta.getTema() + " / " + pregunta.getSubtema());
         addCampo(infoPanel, gbc, y++, "Nivel Dificultad:", pregunta.getNivelDificultad());
-        addCampo(infoPanel, gbc, y++, "Autor:", pregunta.getAutorNombre() != null ? pregunta.getAutorNombre() : ("ID: " + pregunta.getAutorId()));
+        addCampo(infoPanel, gbc, y++, "Autor:",
+                pregunta.getAutorNombre() != null ? pregunta.getAutorNombre() : ("ID: " + pregunta.getAutorId()));
 
         // Observaciones si fue rechazada
         if ("RECHAZADA".equalsIgnoreCase(pregunta.getEstado())) {
             List<String> obs = List.of();
             try {
                 obs = ApiClient.getInstance().obtenerObservaciones(pregunta.getId());
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             String obsTexto = obs.isEmpty() ? "No se registraron notas adicionales." : String.join("\n- ", obs);
             addCampo(infoPanel, gbc, y++, "Observaciones de Revisores:", obsTexto);
         }
@@ -99,13 +103,16 @@ public class DetallePreguntaDialog extends JDialog {
     }
 
     private void addCampo(JPanel panel, GridBagConstraints gbc, int row, String label, String text) {
-        gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.weightx = 0;
         JLabel lbl = new JLabel(label);
         lbl.setFont(UIUtils.FONT_SUBTITLE);
         lbl.setForeground(UIUtils.COLOR_TEXT_PRIMARY);
         panel.add(lbl, gbc);
 
-        gbc.gridx = 1; gbc.weightx = 1.0;
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
         JTextArea area = new JTextArea(text != null ? text : "");
         area.setFont(UIUtils.FONT_REGULAR);
         area.setWrapStyleWord(true);
@@ -123,16 +130,18 @@ public class DetallePreguntaDialog extends JDialog {
                         + "Una vez enviada, no podrá modificarla hasta que concluya el proceso de evaluación.",
                 "Confirmar Envío",
                 JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE
-        );
+                JOptionPane.QUESTION_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
             try {
                 ApiClient.getInstance().enviarARevision(pregunta.getId());
-                JOptionPane.showMessageDialog(this, "Pregunta enviada a revisión exitosamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
-                if (onActualizado != null) onActualizado.run();
+                JOptionPane.showMessageDialog(this, "Pregunta enviada a revisión exitosamente.", "Éxito",
+                        JOptionPane.INFORMATION_MESSAGE);
+                if (onActualizado != null)
+                    onActualizado.run();
                 dispose();
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error enviando a revisión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error enviando a revisión: " + ex.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }

@@ -18,3 +18,4 @@ public class AsignacionNotificacionFactory implements NotificacionFactory {
         return "ASIGNACION_REVISION";
     }
 }
+
