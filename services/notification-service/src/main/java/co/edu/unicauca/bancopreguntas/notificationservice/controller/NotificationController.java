@@ -1,5 +1,7 @@
 package co.edu.unicauca.bancopreguntas.notificationservice.controller;
 
+import co.edu.unicauca.bancopreguntas.contracts.events.DomainEvent;
+import co.edu.unicauca.bancopreguntas.contracts.events.EventParser;
 import co.edu.unicauca.bancopreguntas.notificationservice.model.NotificacionEntity;
 import co.edu.unicauca.bancopreguntas.notificationservice.service.NotificacionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/notificaciones")
@@ -37,5 +40,23 @@ public class NotificationController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-}
 
+    @PostMapping("/eventos")
+    @Operation(summary = "Ingestar y procesar evento de dominio para generación de notificaciones")
+    public ResponseEntity<?> recibirEvento(@RequestBody Map<String, Object> payload) {
+        try {
+            DomainEvent event = EventParser.parse(payload);
+            if (event != null) {
+                List<NotificacionEntity> notificaciones = notificacionService.procesarEvento(event);
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "Evento procesado para notificaciones",
+                        "tipo", event.getEventType(),
+                        "notificacionesGeneradas", notificaciones.size()
+                ));
+            }
+            return ResponseEntity.badRequest().body(Map.of("error", "Tipo de evento no reconocido o payload inválido"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+}

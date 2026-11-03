@@ -128,6 +128,13 @@ public class ApiClient {
 
         HttpResponseData response = sendGet("/preguntas" + query, true);
         if (response.getStatusCode() == 200) {
+            // El backend devuelve objeto paginado: { "content": [...], "totalPages": N, ... }
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            if (root.has("content")) {
+                return objectMapper.readValue(root.get("content").toString(),
+                        new TypeReference<List<PreguntaDTO>>() {});
+            }
+            // Fallback: si ya es un array directo
             return objectMapper.readValue(response.getBody(), new TypeReference<List<PreguntaDTO>>() {});
         }
         throw handleApiError(response);
@@ -195,6 +202,12 @@ public class ApiClient {
     public List<RevisionItemDTO> listarRevisionesAsignadas() throws IOException, ApiException {
         HttpResponseData response = sendGet("/revisiones/asignadas", true);
         if (response.getStatusCode() == 200) {
+            // El backend devuelve objeto paginado: { "content": [...], "totalPages": N, ... }
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            if (root.has("content")) {
+                return objectMapper.readValue(root.get("content").toString(),
+                        new TypeReference<List<RevisionItemDTO>>() {});
+            }
             return objectMapper.readValue(response.getBody(), new TypeReference<List<RevisionItemDTO>>() {});
         }
         throw handleApiError(response);

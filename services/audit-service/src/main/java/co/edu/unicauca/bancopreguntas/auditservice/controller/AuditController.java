@@ -1,5 +1,7 @@
 package co.edu.unicauca.bancopreguntas.auditservice.controller;
 
+import co.edu.unicauca.bancopreguntas.contracts.events.DomainEvent;
+import co.edu.unicauca.bancopreguntas.contracts.events.EventParser;
 import co.edu.unicauca.bancopreguntas.auditservice.model.RegistroAuditoriaEntity;
 import co.edu.unicauca.bancopreguntas.auditservice.service.AuditService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/auditoria")
@@ -43,5 +47,23 @@ public class AuditController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-}
 
+    @PostMapping("/eventos")
+    @Operation(summary = "Ingestar y procesar evento de dominio para registro en bitácora de auditoría")
+    public ResponseEntity<?> recibirEvento(@RequestBody Map<String, Object> payload) {
+        try {
+            DomainEvent event = EventParser.parse(payload);
+            if (event != null) {
+                Optional<RegistroAuditoriaEntity> reg = auditService.registrarEvento(event);
+                return ResponseEntity.ok(Map.of(
+                        "mensaje", "Evento auditado exitosamente",
+                        "tipo", event.getEventType(),
+                        "registrado", reg.isPresent()
+                ));
+            }
+            return ResponseEntity.badRequest().body(Map.of("error", "Tipo de evento no reconocido o payload inválido"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+}

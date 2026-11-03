@@ -17,6 +17,20 @@ public class RevisionItemDTO {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("revisionId")
+    public void setRevisionId(Long revisionId) {
+        if (this.id == null) {
+            this.id = revisionId;
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("preguntaDirecta")
+    public void setPreguntaDirecta(String preguntaDirecta) {
+        if (this.tituloPregunta == null) {
+            this.tituloPregunta = preguntaDirecta;
+        }
+    }
+
     public Long getPreguntaId() { return preguntaId; }
     public void setPreguntaId(Long preguntaId) { this.preguntaId = preguntaId; }
 
