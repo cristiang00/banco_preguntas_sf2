@@ -28,7 +28,8 @@ public class RestCatalogClient implements CatalogClient {
             "RAZONAMIENTO CUANTITATIVO",
             "COMPETENCIAS CIUDADANAS",
             "COMUNICACIÓN ESCRITA", "COMUNICACION ESCRITA",
-            "INGLÉS", "INGLES"
+            "INGLÉS", "INGLES",
+            "DISEÑO DE SOFTWARE", "DISENO DE SOFTWARE"
     );
 
     public RestCatalogClient(RestTemplateBuilder builder,
@@ -97,4 +98,3 @@ public class RestCatalogClient implements CatalogClient {
         return !subtema.trim().isEmpty();
     }
 }
-

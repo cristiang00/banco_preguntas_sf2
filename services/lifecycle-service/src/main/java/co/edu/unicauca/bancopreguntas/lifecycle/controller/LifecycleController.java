@@ -93,6 +93,21 @@ public class LifecycleController {
         return ResponseEntity.ok(Map.of("preguntaId", id, "estado", EstadoPreguntaDTO.BORRADOR.name()));
     }
 
+    @PutMapping("/ciclo-vida/preguntas/{id}/estado")
+    @Operation(summary = "Actualizar administrativamente el estado de una pregunta")
+    public ResponseEntity<?> cambiarEstado(
+            @PathVariable(value = "id") Long id,
+            @RequestParam(value = "estado") String estado) {
+        EstadoPreguntaDTO nuevoEstado = EstadoPreguntaDTO.fromString(estado);
+        lifecycleService.forzarEstado(id, nuevoEstado);
+        return ResponseEntity.ok(Map.of(
+                "preguntaId", id,
+                "estado", nuevoEstado.name(),
+                "label", nuevoEstado.getLabel(),
+                "color", nuevoEstado.getColorHex()
+        ));
+    }
+
     @PutMapping("/ciclo-vida/preguntas/{id}/decision")
     @Operation(summary = "Aplicar decisión de revisores (Aprobada / Rechazada) coordinada desde Review Service")
     public ResponseEntity<?> aplicarDecision(
@@ -124,4 +139,3 @@ public class LifecycleController {
         }
     }
 }
-

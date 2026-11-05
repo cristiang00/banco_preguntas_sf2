@@ -3,7 +3,8 @@ package co.edu.unicauca.bancopreguntas.contracts.dto;
 import java.io.Serializable;
 
 /**
- * Enumeración canónica de estados y colores del ciclo de vida de una pregunta (HU2 - SSCRUM-42, SSCRUM-44).
+ * Enumeración canónica de estados y colores del ciclo de vida de una pregunta
+ * (HU2 - SSCRUM-42, SSCRUM-44).
  */
 public enum EstadoPreguntaDTO implements Serializable {
     BORRADOR("Borrador", "#6C757D"),
@@ -28,7 +29,8 @@ public enum EstadoPreguntaDTO implements Serializable {
     }
 
     public static EstadoPreguntaDTO fromString(String str) {
-        if (str == null) return BORRADOR;
+        if (str == null)
+            return BORRADOR;
         try {
             return EstadoPreguntaDTO.valueOf(str.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
@@ -41,4 +43,3 @@ public enum EstadoPreguntaDTO implements Serializable {
         }
     }
 }
-

@@ -151,13 +151,23 @@ public class ApiClient {
     public EstadoPreguntaDTO enviarARevision(Long id) throws IOException, ApiException {
         HttpResponseData response = sendPut("/preguntas/" + id + "/enviar-revision", "{}", true);
         if (response.getStatusCode() == 200) {
+            EstadoPreguntaDTO nuevoEstado = EstadoPreguntaDTO.PENDIENTE_REVISION;
             try {
                 com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
                 if (root.has("estado")) {
-                    return EstadoPreguntaDTO.fromString(root.get("estado").asText());
+                    nuevoEstado = EstadoPreguntaDTO.fromString(root.get("estado").asText());
                 }
             } catch (Exception ignored) {}
-            return EstadoPreguntaDTO.PENDIENTE_REVISION;
+
+            // SSCRUM-HU4: Sincronizar proyección de estado en questions-service
+            // para que la pregunta aparezca en la lista de pendientes del administrador
+            try {
+                sendPut("/preguntas/" + id + "/proyeccion-estado?estado=" + nuevoEstado.name(), "{}", true);
+            } catch (Exception ignored) {
+                // Best-effort: si falla la sincronización, el estado ya cambió en lifecycle
+            }
+
+            return nuevoEstado;
         }
         throw handleApiError(response);
     }

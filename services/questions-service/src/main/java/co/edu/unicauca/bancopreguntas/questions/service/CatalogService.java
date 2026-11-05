@@ -12,7 +12,8 @@ public class CatalogService {
             "Razonamiento Cuantitativo",
             "Competencias Ciudadanas",
             "Comunicación Escrita",
-            "Inglés"
+            "Inglés",
+            "Diseño de Software"
     );
 
     private final List<String> temas = List.of(
@@ -23,7 +24,12 @@ public class CatalogService {
             "Constitución y Ciudadanía",
             "Comprensión Lectora",
             "Gramática y Cohesión",
-            "Vocabulario y Sintaxis"
+            "Vocabulario y Sintaxis",
+            "Arquitectura y Patrones",
+            "Algoritmos y Estructuras",
+            "Bases de Datos",
+            "Pruebas y Calidad",
+            "Estadística y Probabilidad"
     );
 
     private final List<String> subtemas = List.of(
@@ -34,7 +40,12 @@ public class CatalogService {
             "Mecanismos de Participación Ciudadana",
             "Inferencia Textual",
             "Conectores Lógicos",
-            "Tiempos Verbales"
+            "Tiempos Verbales",
+            "Patrones GoF",
+            "Microservicios",
+            "Eventos y Mensajería",
+            "Refactorización",
+            "Modelado Relacional"
     );
 
     public List<String> listarCompetencias() {
@@ -49,4 +60,3 @@ public class CatalogService {
         return subtemas;
     }
 }
-

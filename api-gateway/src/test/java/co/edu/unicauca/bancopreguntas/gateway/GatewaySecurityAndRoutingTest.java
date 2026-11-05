@@ -113,7 +113,8 @@ class GatewaySecurityAndRoutingTest {
     @DisplayName("Enrutamiento HU2: /preguntas/{id}/enviar-revision debe enrutar a lifecycle-service")
     void testRouteEnviarARevisionDirectsToLifecycle() {
         String target = controller.resolveTargetService("/preguntas/42/enviar-revision");
-        assertEquals(properties.getLifecycle(), target, "El endpoint enviar-revision debe ser dirigido a lifecycle-service");
+        assertEquals(properties.getLifecycle(), target,
+                "El endpoint enviar-revision debe ser dirigido a lifecycle-service");
 
     }
 

@@ -89,7 +89,7 @@ public class AsignarRevisoresPanel extends JPanel {
     public void cargarDatos() {
         SwingUtilities.invokeLater(() -> {
             try {
-                // Cargar preguntas pendientes
+                // Cargar preguntas pendientes sin revisores asignados
                 List<PreguntaDTO> preguntas = ApiClient.getInstance().listarPreguntasPendientesRevision();
                 preguntasPendientes.clear();
                 preguntasPendientes.addAll(preguntas);
@@ -110,6 +110,8 @@ public class AsignarRevisoresPanel extends JPanel {
                 for (UserSummaryDTO r : revisores) {
                     modelRevisores.addElement(r);
                 }
+                listaRevisores.clearSelection();
+                listaRevisores.setBorder(UIUtils.BORDER_DEFAULT);
 
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Error cargando datos: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);

@@ -37,12 +37,12 @@ public class ReviewService {
     private final ReviewEventPublisher eventPublisher;
 
     public ReviewService(RevisionRepository revisionRepository,
-                         EvaluacionRevisorRepository evaluacionRepository,
-                         ObservacionRepository observacionRepository,
-                         UsersServiceClient usersClient,
-                         QuestionsServiceClient questionsClient,
-                         LifecycleServiceClient lifecycleClient,
-                         ReviewEventPublisher eventPublisher) {
+            EvaluacionRevisorRepository evaluacionRepository,
+            ObservacionRepository observacionRepository,
+            UsersServiceClient usersClient,
+            QuestionsServiceClient questionsClient,
+            LifecycleServiceClient lifecycleClient,
+            ReviewEventPublisher eventPublisher) {
         this.revisionRepository = revisionRepository;
         this.evaluacionRepository = evaluacionRepository;
         this.observacionRepository = observacionRepository;
@@ -53,10 +53,12 @@ public class ReviewService {
     }
 
     @Transactional
-    public List<RevisionEntity> asignarRevisores(Long preguntaId, List<Long> revisorIds, Long adminId, String correlationId) {
+    public List<RevisionEntity> asignarRevisores(Long preguntaId, List<Long> revisorIds, Long adminId,
+            String correlationId) {
         // HU4 - Validación de cantidad obligatoria (0 -> Error 400, > 3 -> Error 400)
         if (revisorIds == null || revisorIds.isEmpty()) {
-            throw new IllegalArgumentException("Debe seleccionar al menos un revisor (entre 1 y 3 revisores permitidos)");
+            throw new IllegalArgumentException(
+                    "Debe seleccionar al menos un revisor (entre 1 y 3 revisores permitidos)");
         }
         if (revisorIds.size() > 3) {
             throw new IllegalArgumentException("Solo se permite asignar un máximo de 3 revisores por pregunta");
@@ -67,13 +69,15 @@ public class ReviewService {
 
         // HU4 - Exclusión del autor de su propia pregunta
         if (pregunta.getAutorId() != null && revisorIds.contains(pregunta.getAutorId())) {
-            throw new IllegalArgumentException("El autor de la pregunta no puede ser asignado como revisor de su propia pregunta");
+            throw new IllegalArgumentException(
+                    "El autor de la pregunta no puede ser asignado como revisor de su propia pregunta");
         }
 
         // HU4 - Verificar que el estado permita asignación
         EstadoPreguntaDTO estado = lifecycleClient.obtenerEstado(preguntaId);
         if (estado != EstadoPreguntaDTO.PENDIENTE_REVISION) {
-            throw new IllegalStateException("Solo las preguntas en estado Pendiente de revisión pueden tener revisores asignados");
+            throw new IllegalStateException(
+                    "Solo las preguntas en estado Pendiente de revisión pueden tener revisores asignados");
         }
 
         // Validar revisores en Users Service
@@ -82,24 +86,35 @@ public class ReviewService {
 
         for (Long revId : revisorIds) {
             UserSummaryDTO user = usersClient.buscarPorId(revId)
-                    .orElseThrow(() -> new IllegalArgumentException("El usuario revisor con ID " + revId + " no existe"));
+                    .orElseThrow(
+                            () -> new IllegalArgumentException("El usuario revisor con ID " + revId + " no existe"));
 
             if (!"REVISOR".equalsIgnoreCase(user.getRol())) {
-                throw new IllegalArgumentException("El usuario " + user.getNombreUsuario() + " no tiene rol de Revisor");
+                throw new IllegalArgumentException(
+                        "El usuario " + user.getNombreUsuario() + " no tiene rol de Revisor");
             }
 
             if (!"ACTIVO".equalsIgnoreCase(user.getEstado())) {
                 throw new IllegalArgumentException("El revisor " + user.getNombreUsuario() + " está inactivo");
             }
 
-            // Prevenir asignaciones duplicadas
-            if (!revisionRepository.existsByPreguntaIdAndRevisorId(preguntaId, revId)) {
+            // Prevenir asignaciones duplicadas o reactivar si ya existía previamente
+            Optional<RevisionEntity> existente = revisionRepository.findByPreguntaIdAndRevisorId(preguntaId, revId);
+            if (existente.isEmpty()) {
                 RevisionEntity rev = new RevisionEntity(preguntaId, revId, user.getNombreCompleto(), user.getEmail());
+                RevisionEntity guardada = revisionRepository.save(rev);
+                asignacionesCreadas.add(guardada);
+            } else {
+                RevisionEntity rev = existente.get();
+                rev.setEstado(EstadoRevision.ASIGNADA);
+                rev.setFechaAsignacion(LocalDateTime.now());
+                rev.setFechaDecision(null);
                 RevisionEntity guardada = revisionRepository.save(rev);
                 asignacionesCreadas.add(guardada);
             }
 
-            revisoresInfo.add(new RevisoresAsignadosEvent.RevisorInfo(user.getId(), user.getNombreCompleto(), user.getEmail()));
+            revisoresInfo.add(
+                    new RevisoresAsignadosEvent.RevisorInfo(user.getId(), user.getNombreCompleto(), user.getEmail()));
         }
 
         // HU4 - Publicar evento RevisoresAsignados en el broker
@@ -109,15 +124,21 @@ public class ReviewService {
                 pregunta.getAutorNombre(),
                 pregunta.getContexto(),
                 revisoresInfo,
-                correlationId
-        );
+                correlationId);
         eventPublisher.publish(event);
 
         return asignacionesCreadas;
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> listarAsignadas(Long revisorId, int page, int size, String dificultad, String competencia) {
+    public boolean tieneRevisoresAsignados(Long preguntaId) {
+        List<RevisionEntity> revs = revisionRepository.findByPreguntaId(preguntaId);
+        return revs.stream().anyMatch(r -> r.getEstado() == EstadoRevision.ASIGNADA || r.getEstado() == EstadoRevision.EVALUADA);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> listarAsignadas(Long revisorId, int page, int size, String dificultad,
+            String competencia) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size));
         Page<RevisionEntity> revPage = revisionRepository.findByRevisorId(revisorId, pageable);
 
@@ -128,10 +149,12 @@ public class ReviewService {
                 PreguntaDTO p = pOpt.get();
 
                 // Filtro en memoria opcional por dificultad o competencia si se solicita
-                if (dificultad != null && !"TODOS".equalsIgnoreCase(dificultad) && !dificultad.equalsIgnoreCase(p.getNivelDificultad())) {
+                if (dificultad != null && !"TODOS".equalsIgnoreCase(dificultad)
+                        && !dificultad.equalsIgnoreCase(p.getNivelDificultad())) {
                     continue;
                 }
-                if (competencia != null && !competencia.isBlank() && !competencia.equalsIgnoreCase(p.getCompetencia())) {
+                if (competencia != null && !competencia.isBlank()
+                        && !competencia.equalsIgnoreCase(p.getCompetencia())) {
                     continue;
                 }
 
@@ -180,8 +203,7 @@ public class ReviewService {
                 revisionId,
                 req.getCriterio() != null ? req.getCriterio() : "General",
                 req.getCalificacion() != null ? req.getCalificacion() : 5.0,
-                req.getComentario()
-        );
+                req.getComentario());
         EvaluacionRevisorEntity guardada = evaluacionRepository.save(eval);
 
         // Guardar observaciones visibles para el autor
@@ -290,6 +312,7 @@ public class ReviewService {
                         preguntaId, pregunta.getAutorId(), pregunta.getAutorNombre(), "autor@unicauca.edu.co",
                         pregunta.getContexto(), "Pregunta aprobada por todos los revisores", correlationId
                 );
+
                 eventPublisher.publish(aprobadaEvent);
             }
 
@@ -305,4 +328,3 @@ public class ReviewService {
         return observacionRepository.findByPreguntaIdAndVisibleAutorTrue(preguntaId);
     }
 }
-

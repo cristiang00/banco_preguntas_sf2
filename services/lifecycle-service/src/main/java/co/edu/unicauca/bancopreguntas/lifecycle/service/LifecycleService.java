@@ -4,6 +4,7 @@ import co.edu.unicauca.bancopreguntas.contracts.dto.EstadoPreguntaDTO;
 import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaAprobadaEvent;
 import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaEnviadaARevisionEvent;
 import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaRechazadaEvent;
+import co.edu.unicauca.bancopreguntas.lifecycle.client.QuestionsServiceClient;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.HistorialTransicionEntity;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.PreguntaCicloVidaEntity;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.state.AccesoDenegadoException;
@@ -13,11 +14,12 @@ import co.edu.unicauca.bancopreguntas.lifecycle.domain.state.TransicionInvalidaE
 import co.edu.unicauca.bancopreguntas.lifecycle.messaging.LifecycleEventPublisher;
 import co.edu.unicauca.bancopreguntas.lifecycle.repository.HistorialTransicionRepository;
 import co.edu.unicauca.bancopreguntas.lifecycle.repository.PreguntaCicloVidaRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class LifecycleService {
@@ -25,13 +27,23 @@ public class LifecycleService {
     private final PreguntaCicloVidaRepository cicloVidaRepository;
     private final HistorialTransicionRepository historialRepository;
     private final LifecycleEventPublisher eventPublisher;
+    private final QuestionsServiceClient questionsClient;
 
     public LifecycleService(PreguntaCicloVidaRepository cicloVidaRepository,
                             HistorialTransicionRepository historialRepository,
                             LifecycleEventPublisher eventPublisher) {
+        this(cicloVidaRepository, historialRepository, eventPublisher, null);
+    }
+
+    @Autowired
+    public LifecycleService(PreguntaCicloVidaRepository cicloVidaRepository,
+                            HistorialTransicionRepository historialRepository,
+                            LifecycleEventPublisher eventPublisher,
+                            @Autowired(required = false) QuestionsServiceClient questionsClient) {
         this.cicloVidaRepository = cicloVidaRepository;
         this.historialRepository = historialRepository;
         this.eventPublisher = eventPublisher;
+        this.questionsClient = questionsClient;
     }
 
     @Transactional
@@ -94,6 +106,13 @@ public class LifecycleService {
         );
         eventPublisher.publish(event);
 
+        // SSCRUM-HU4: Sincronización proactiva de proyección de estado en Questions Service
+        if (questionsClient != null) {
+            try {
+                questionsClient.actualizarProyeccionEstado(preguntaId, entity.getEstado().name());
+            } catch (Exception ignored) {}
+        }
+
         return entity.getEstado();
     }
 
@@ -133,7 +152,35 @@ public class LifecycleService {
             throw new IllegalArgumentException("Decisión inválida: " + decision);
         }
 
+        // SSCRUM-HU5: Sincronización proactiva de proyección de estado en Questions Service
+        if (questionsClient != null) {
+            try {
+                questionsClient.actualizarProyeccionEstado(preguntaId, entity.getEstado().name());
+            } catch (Exception ignored) {}
+        }
+
         return entity.getEstado();
     }
-}
 
+    @Transactional
+    public void forzarEstado(Long preguntaId, EstadoPreguntaDTO nuevoEstado) {
+        PreguntaCicloVidaEntity entity = cicloVidaRepository.findById(preguntaId)
+                .orElseGet(() -> new PreguntaCicloVidaEntity(preguntaId, 3L, nuevoEstado));
+        EstadoPreguntaDTO estadoAnterior = entity.getEstado();
+        entity.setEstado(nuevoEstado);
+        cicloVidaRepository.save(entity);
+        historialRepository.save(new HistorialTransicionEntity(
+                preguntaId,
+                estadoAnterior,
+                nuevoEstado,
+                1L,
+                "Actualización administrativa de estado"
+        ));
+
+        if (questionsClient != null) {
+            try {
+                questionsClient.actualizarProyeccionEstado(preguntaId, nuevoEstado.name());
+            } catch (Exception ignored) {}
+        }
+    }
+}

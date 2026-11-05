@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/revisiones")
@@ -68,7 +69,11 @@ public class ReviewController {
     @GetMapping("/pendientes")
     @Operation(summary = "Consultar listado de preguntas pendientes de revisión para el Administrador (HU4)")
     public ResponseEntity<List<PreguntaDTO>> listarPendientes() {
-        return ResponseEntity.ok(questionsClient.listarPreguntasPendientes());
+        List<PreguntaDTO> pendientes = questionsClient.listarPreguntasPendientes();
+        List<PreguntaDTO> sinAsignar = pendientes.stream()
+                .filter(p -> !reviewService.tieneRevisoresAsignados(p.getId()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(sinAsignar);
     }
 
     @GetMapping("/asignadas")
@@ -144,4 +149,3 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.listarObservaciones(preguntaId));
     }
 }
-
