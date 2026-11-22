@@ -50,8 +50,8 @@ public class ReviewController {
     })
     public ResponseEntity<?> asignarRevisores(
             @RequestBody AsignarRevisoresRequestDTO request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "ADMINISTRADOR") String userRole,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
         if (!"ADMINISTRADOR".equalsIgnoreCase(userRole)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los administradores pueden asignar revisores"));
@@ -90,8 +90,8 @@ public class ReviewController {
         @ApiResponse(responseCode = "403", description = "Acceso denegado: rol Revisor requerido")
     })
     public ResponseEntity<?> listarAsignadas(
-            @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "REVISOR") String userRole,
+            @RequestHeader(value = "X-User-Id", required = true) Long revisorId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole,
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "10") int size,
             @RequestParam(value = "estado", required = false) String estado,
@@ -113,7 +113,7 @@ public class ReviewController {
     public ResponseEntity<?> registrarEvaluacion(
             @PathVariable(value = "id") Long id,
             @RequestBody EvaluacionRequestDTO request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId) {
+            @RequestHeader(value = "X-User-Id", required = true) Long revisorId) {
         try {
             EvaluacionRevisorEntity eval = reviewService.registrarEvaluacion(id, request, revisorId);
             return ResponseEntity.ok(eval);
@@ -137,7 +137,7 @@ public class ReviewController {
     public ResponseEntity<?> registrarDecision(
             @PathVariable(value = "id") Long id,
             @RequestBody DecisionRequestDTO request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId,
+            @RequestHeader(value = "X-User-Id", required = true) Long revisorId,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
         try {
             RevisionEntity rev = reviewService.registrarDecision(id, request, revisorId, correlationId);

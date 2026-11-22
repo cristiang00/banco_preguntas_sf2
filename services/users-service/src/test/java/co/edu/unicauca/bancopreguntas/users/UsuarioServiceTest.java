@@ -40,10 +40,12 @@ class UsuarioServiceTest {
         service = new UsuarioService(repository, hasher, jwtUtil);
     }
 
+    // ─── Tests originales ─────────────────────────────────────────────────────
+
     @Test
-    @DisplayName("Autenticación exitosa con credenciales válidas")
+    @DisplayName("Autenticacion exitosa con credenciales validas")
     void autenticar_exitoso() {
-        UsuarioEntity user = new UsuarioEntity(1L, "juan12", "Juan Pérez", "juan@unicauca.edu.co",
+        UsuarioEntity user = new UsuarioEntity(1L, "juan12", "Juan Perez", "juan@unicauca.edu.co",
                 Rol.AUTOR, EstadoUsuario.ACTIVO, "hash123", LocalDateTime.now());
         repository.save(user);
         hasher.setResult(true);
@@ -57,9 +59,9 @@ class UsuarioServiceTest {
     }
 
     @Test
-    @DisplayName("Autenticación fallida por contraseña incorrecta")
+    @DisplayName("Autenticacion fallida por contrasena incorrecta")
     void autenticar_passwordInvalido() {
-        UsuarioEntity user = new UsuarioEntity(1L, "juan12", "Juan Pérez", "juan@unicauca.edu.co",
+        UsuarioEntity user = new UsuarioEntity(1L, "juan12", "Juan Perez", "juan@unicauca.edu.co",
                 Rol.AUTOR, EstadoUsuario.ACTIVO, "hash123", LocalDateTime.now());
         repository.save(user);
         hasher.setResult(false);
@@ -68,7 +70,7 @@ class UsuarioServiceTest {
     }
 
     @Test
-    @DisplayName("Autenticación rechazada para usuario inactivo")
+    @DisplayName("Autenticacion rechazada para usuario inactivo")
     void autenticar_usuarioInactivo() {
         UsuarioEntity user = new UsuarioEntity(1L, "pepe12", "Pepito", "pepe@unicauca.edu.co",
                 Rol.ADMINISTRADOR, EstadoUsuario.INACTIVO, "hash123", LocalDateTime.now());
@@ -80,9 +82,9 @@ class UsuarioServiceTest {
     @Test
     @DisplayName("Listar revisores activos")
     void listarRevisores_retornaSoloRevisoresActivos() {
-        UsuarioEntity revisor1 = new UsuarioEntity(6L, "Juanita", "Juana Pérez", "juanita@unicauca.edu.co",
+        UsuarioEntity revisor1 = new UsuarioEntity(6L, "Juanita", "Juana Perez", "juanita@unicauca.edu.co",
                 Rol.REVISOR, EstadoUsuario.ACTIVO, "hash", LocalDateTime.now());
-        UsuarioEntity revisor2 = new UsuarioEntity(10L, "Juan6", "Juan García", "juan6@unicauca.edu.co",
+        UsuarioEntity revisor2 = new UsuarioEntity(10L, "Juan6", "Juan Garcia", "juan6@unicauca.edu.co",
                 Rol.REVISOR, EstadoUsuario.ACTIVO, "hash", LocalDateTime.now());
         UsuarioEntity autor = new UsuarioEntity(1L, "juan12", "Juan Autor", "juan12@unicauca.edu.co",
                 Rol.AUTOR, EstadoUsuario.ACTIVO, "hash", LocalDateTime.now());
@@ -97,6 +99,76 @@ class UsuarioServiceTest {
         assertEquals("Juanita", revisores.get(0).getNombreUsuario());
         assertEquals("Juan6", revisores.get(1).getNombreUsuario());
     }
+
+    // ─── HU10.S3.1: Tests adaptados al flujo Keycloak ────────────────────────
+
+    @Test
+    @DisplayName("HU10.S3.1 - Registro de usuario nuevo con rol AUTOR")
+    void registrar_usuarioNuevo_guardaCorrectamente() {
+        UserSummaryDTO dto = service.registrar(
+                "nuevoautor", "Nuevo Autor", "nuevo@unicauca.edu.co", "Password1!", Rol.AUTOR
+        );
+        assertNotNull(dto);
+        assertEquals("nuevoautor", dto.getNombreUsuario());
+        assertEquals("AUTOR", dto.getRol());
+        assertEquals(1, repository.count());
+    }
+
+    @Test
+    @DisplayName("HU10.S3.1 - Registro duplicado lanza IllegalArgumentException")
+    void registrar_usuarioDuplicado_lanzaExcepcion() {
+        UsuarioEntity existente = new UsuarioEntity(1L, "autor1", "Autor Uno", "autor1@unicauca.edu.co",
+                Rol.AUTOR, EstadoUsuario.ACTIVO, "hash123", LocalDateTime.now());
+        repository.save(existente);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                service.registrar("autor1", "Otro Nombre", "otro@unicauca.edu.co", "Password2!", Rol.AUTOR));
+    }
+
+    @Test
+    @DisplayName("HU10.S3.1 - Busqueda por ID retorna DTO con email (review-service lo usa para notificaciones)")
+    void buscarPorId_existente_retornaDTOConEmail() {
+        UsuarioEntity u = new UsuarioEntity(5L, "revisor1", "Revisor Uno", "revisor1@unicauca.edu.co",
+                Rol.REVISOR, EstadoUsuario.ACTIVO, "h", LocalDateTime.now());
+        repository.save(u);
+
+        Optional<UserSummaryDTO> found = service.buscarPorId(5L);
+
+        assertTrue(found.isPresent());
+        assertEquals("revisor1@unicauca.edu.co", found.get().getEmail());
+        assertEquals("REVISOR", found.get().getRol());
+    }
+
+    @Test
+    @DisplayName("HU10.S3.1 - Busqueda por ID inexistente retorna Optional vacio")
+    void buscarPorId_inexistente_retornaEmpty() {
+        assertTrue(service.buscarPorId(999L).isEmpty());
+    }
+
+    @Test
+    @DisplayName("HU10.S3.1 - Busqueda por preferredUsername Keycloak es case-insensitive")
+    void buscarPorUsername_caseInsensitive() {
+        UsuarioEntity u = new UsuarioEntity(2L, "Admin1", "Admin Uno", "admin@unicauca.edu.co",
+                Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO, "h", LocalDateTime.now());
+        repository.save(u);
+
+        Optional<UserSummaryDTO> found = service.buscarPorUsername("admin1");
+        assertTrue(found.isPresent());
+        assertEquals("ADMINISTRADOR", found.get().getRol());
+    }
+
+    @Test
+    @DisplayName("HU10.S3.1 - Listar todos retorna usuarios de todos los roles")
+    void listarTodos_retornaTodosLosUsuarios() {
+        repository.save(new UsuarioEntity(1L, "a1", "Autor Uno", "a1@u.co", Rol.AUTOR, EstadoUsuario.ACTIVO, "h", LocalDateTime.now()));
+        repository.save(new UsuarioEntity(2L, "r1", "Revisor Uno", "r1@u.co", Rol.REVISOR, EstadoUsuario.ACTIVO, "h", LocalDateTime.now()));
+        repository.save(new UsuarioEntity(3L, "adm", "Admin Uno", "adm@u.co", Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO, "h", LocalDateTime.now()));
+
+        List<UserSummaryDTO> todos = service.listarTodos();
+        assertEquals(3, todos.size());
+    }
+
+    // ─── Stubs ───────────────────────────────────────────────────────────────
 
     private static class StubPasswordHasher implements PasswordHasher {
         private boolean result = true;

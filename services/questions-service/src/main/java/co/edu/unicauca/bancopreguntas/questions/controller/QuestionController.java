@@ -35,8 +35,8 @@ public class QuestionController {
     })
     public ResponseEntity<?> crearPregunta(
             @RequestBody PreguntaDTO dto,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
-            @RequestHeader(value = "X-User-Name", defaultValue = "Autor") String userName) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Name", required = false, defaultValue = "") String userName) {
         try {
             PreguntaDTO creada = questionService.crearPregunta(dto, userId, userName);
             return ResponseEntity.status(HttpStatus.CREATED).body(creada);
@@ -60,8 +60,8 @@ public class QuestionController {
             @RequestParam(value = "dificultad", required = false, defaultValue = "TODOS") String dificultad,
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "10") int size,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "AUTOR") String userRole) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole) {
 
         boolean esAdmin = "ADMINISTRADOR".equalsIgnoreCase(userRole);
         Long autorId = esAdmin ? null : userId;
@@ -93,8 +93,8 @@ public class QuestionController {
     })
     public ResponseEntity<?> consultarDetalle(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "AUTOR") String userRole) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole) {
         try {
             boolean esAdmin = "ADMINISTRADOR".equalsIgnoreCase(userRole);
             return queryFacade.consultarDetalle(id, userId, esAdmin)
@@ -116,7 +116,7 @@ public class QuestionController {
     public ResponseEntity<?> editarBorrador(
             @PathVariable(value = "id") Long id,
             @RequestBody PreguntaDTO dto,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId) {
         try {
             PreguntaDTO actualizada = questionService.editarBorrador(id, dto, userId);
             return ResponseEntity.ok(actualizada);
@@ -142,7 +142,7 @@ public class QuestionController {
     public ResponseEntity<?> crearNuevaVersion(
             @PathVariable(value = "id") Long id,
             @RequestBody(required = false) PreguntaDTO dto,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId) {
         try {
             PreguntaDTO versionada = questionService.crearNuevaVersion(id, dto, userId);
             return ResponseEntity.ok(versionada);

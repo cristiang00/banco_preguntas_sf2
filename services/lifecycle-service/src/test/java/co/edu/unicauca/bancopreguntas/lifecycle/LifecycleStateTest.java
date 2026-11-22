@@ -251,4 +251,83 @@ class LifecycleStateTest {
             service.crearNuevaVersion(preguntaId, otroUsuarioId, "corr-4")
         );
     }
+
+    // ─── HU10.S2.1: QuestionStateFactory y patrones State ────────────────────
+
+    @Test
+    @DisplayName("HU10.S2.1 - QuestionStateFactory mapea correctamente cada EstadoPreguntaDTO")
+    void stateFactory_mapeoCorrectoDesdeDTOs() {
+        assertTrue(QuestionStateFactory.fromDTO(EstadoPreguntaDTO.BORRADOR) instanceof DraftState);
+        assertTrue(QuestionStateFactory.fromDTO(EstadoPreguntaDTO.PENDIENTE_REVISION) instanceof PendingReviewState);
+        assertTrue(QuestionStateFactory.fromDTO(EstadoPreguntaDTO.APROBADA) instanceof ApprovedState);
+        assertTrue(QuestionStateFactory.fromDTO(EstadoPreguntaDTO.RECHAZADA) instanceof RejectedState);
+        assertTrue(QuestionStateFactory.fromDTO(null) instanceof DraftState, "null debe producir DraftState");
+    }
+
+    @Test
+    @DisplayName("HU10.S2.1 - QuestionStateFactory.fromString mapea desde cadena de texto")
+    void stateFactory_mapeoDesdeString() {
+        assertTrue(QuestionStateFactory.fromString("BORRADOR") instanceof DraftState);
+        assertTrue(QuestionStateFactory.fromString("PENDIENTE_REVISION") instanceof PendingReviewState);
+        assertTrue(QuestionStateFactory.fromString("APROBADA") instanceof ApprovedState);
+        assertTrue(QuestionStateFactory.fromString("RECHAZADA") instanceof RejectedState);
+        assertTrue(QuestionStateFactory.fromString("INVALIDO") instanceof DraftState, "Estado invalido debe devolver DraftState");
+        assertTrue(QuestionStateFactory.fromString(null) instanceof DraftState, "null debe devolver DraftState");
+    }
+
+    @Test
+    @DisplayName("HU10.S2.1 - Transicion Pendiente -> Aprobada (aplicarDecisionRevisor APROBAR)")
+    void aplicarDecision_aprobar_cambiaAAprobada() {
+        Long preguntaId = 300L;
+        Long adminId = 1L;
+        PreguntaCicloVidaEntity entity = new PreguntaCicloVidaEntity(preguntaId, 5L, EstadoPreguntaDTO.PENDIENTE_REVISION);
+        cicloVidaRepo.save(entity);
+
+        EstadoPreguntaDTO resultado = service.aplicarDecisionRevisor(
+                preguntaId, "APROBAR", adminId, "autor@unicauca.edu.co",
+                "Contexto de aprobacion", null, "corr-aprobar"
+        );
+
+        assertEquals(EstadoPreguntaDTO.APROBADA, resultado);
+        assertEquals(EstadoPreguntaDTO.APROBADA, entity.getEstado());
+        assertFalse(historialRepo.list.isEmpty());
+    }
+
+    @Test
+    @DisplayName("HU10.S2.1 - Transicion Pendiente -> Rechazada (aplicarDecisionRevisor RECHAZAR)")
+    void aplicarDecision_rechazar_cambiaArechazada() {
+        Long preguntaId = 301L;
+        Long adminId = 1L;
+        PreguntaCicloVidaEntity entity = new PreguntaCicloVidaEntity(preguntaId, 5L, EstadoPreguntaDTO.PENDIENTE_REVISION);
+        cicloVidaRepo.save(entity);
+
+        EstadoPreguntaDTO resultado = service.aplicarDecisionRevisor(
+                preguntaId, "RECHAZAR", adminId, "autor@unicauca.edu.co",
+                "Contexto de rechazo", List.of("Falta bibliografía"), "corr-rechazar"
+        );
+
+        assertEquals(EstadoPreguntaDTO.RECHAZADA, resultado);
+        assertEquals(EstadoPreguntaDTO.RECHAZADA, entity.getEstado());
+    }
+
+    @Test
+    @DisplayName("HU10.S2.1 - puedeEditar es true solo en estado BORRADOR")
+    void puedeEditar_soloEnBorrador() {
+        // Pregunta en Borrador
+        Long p1 = 310L;
+        service.registrarPreguntaInicial(p1, 5L);
+        assertTrue(service.puedeEditar(p1));
+
+        // Pregunta en Pendiente
+        Long p2 = 311L;
+        PreguntaCicloVidaEntity enPendiente = new PreguntaCicloVidaEntity(p2, 5L, EstadoPreguntaDTO.PENDIENTE_REVISION);
+        cicloVidaRepo.save(enPendiente);
+        assertFalse(service.puedeEditar(p2));
+
+        // Pregunta Aprobada
+        Long p3 = 312L;
+        PreguntaCicloVidaEntity enAprobada = new PreguntaCicloVidaEntity(p3, 5L, EstadoPreguntaDTO.APROBADA);
+        cicloVidaRepo.save(enAprobada);
+        assertFalse(service.puedeEditar(p3));
+    }
 }

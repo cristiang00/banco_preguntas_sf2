@@ -34,8 +34,8 @@ public class LifecycleController {
     })
     public ResponseEntity<?> enviarARevision(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
-            @RequestHeader(value = "X-User-Name", defaultValue = "Autor") String userName,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Name", required = false, defaultValue = "") String userName,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
             @RequestBody(required = false) Map<String, Object> body) {
         try {
@@ -71,7 +71,7 @@ public class LifecycleController {
     })
     public ResponseEntity<?> crearNuevaVersion(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
         try {
             EstadoPreguntaDTO nuevoEstado = lifecycleService.crearNuevaVersion(id, userId, correlationId);
@@ -141,7 +141,7 @@ public class LifecycleController {
     @Operation(summary = "Aplicar decisión de revisores (Aprobada / Rechazada) coordinada desde Review Service")
     public ResponseEntity<?> aplicarDecision(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
             @RequestBody Map<String, Object> body) {
         try {
