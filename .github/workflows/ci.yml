@@ -30,7 +30,7 @@ jobs:
 
       # 3. Compilar y ejecutar TODOS los tests del monorepo
       - name: Ejecutar mvn test (monorepo completo)
-        run: ./mvnw test --batch-mode --no-transfer-progress
+        run: mvn test --batch-mode --no-transfer-progress
 
       # 4. Publicar resultados de pruebas como artefacto en caso de fallo
       - name: Publicar reportes de pruebas
@@ -51,4 +51,3 @@ jobs:
           echo "- **Módulos:** contracts, api-gateway, users-service, questions-service," >> $GITHUB_STEP_SUMMARY
           echo "  validation-service, lifecycle-service, review-service," >> $GITHUB_STEP_SUMMARY
           echo "  notification-service, audit-service, frontend, integration-tests" >> $GITHUB_STEP_SUMMARY
-

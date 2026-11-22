@@ -1,6 +1,6 @@
 # Banco de Preguntas Saber Pro — SF2
 
-[![CI](https://github.com/TU_USUARIO/banco_preguntas_sf2/actions/workflows/ci.yml/badge.svg)](https://github.com/TU_USUARIO/banco_preguntas_sf2/actions/workflows/ci.yml)
+[![CI](https://github.com/cristiang00/banco_preguntas_sf2/actions/workflows/ci.yml/badge.svg)](https://github.com/cristiang00/banco_preguntas_sf2/actions/workflows/ci.yml)
 [![Java 17](https://img.shields.io/badge/Java-17-blue?logo=openjdk)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?logo=spring)](https://spring.io/projects/spring-boot)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)](https://docs.docker.com/compose/)

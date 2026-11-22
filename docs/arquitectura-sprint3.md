@@ -4,7 +4,7 @@
 > **Versión:** 2.0.0 (Sprint 3 — Seguridad y Arquitectura Limpia)  
 > **Fecha:** Noviembre 2026  
 > **Autores:** Equipo SF2 — Universidad del Cauca  
-> **Repositorio:** https://github.com/TU_USUARIO/banco_preguntas_sf2  
+> **Repositorio:** https://github.com/cristiang00/banco_preguntas_sf2  
 
 ---
 
@@ -354,7 +354,7 @@ Push / PR → Checkout → Java 17 (Temurin) → mvn test (12 módulos) → Repo
 **Badge de estado:**
 
 ```markdown
-[![CI](https://github.com/TU_USUARIO/banco_preguntas_sf2/actions/workflows/ci.yml/badge.svg)](https://github.com/TU_USUARIO/banco_preguntas_sf2/actions/workflows/ci.yml)
+[![CI](https://github.com/cristiang00/banco_preguntas_sf2/actions/workflows/ci.yml/badge.svg)](https://github.com/cristiang00/banco_preguntas_sf2/actions/workflows/ci.yml)
 ```
 
 ---
