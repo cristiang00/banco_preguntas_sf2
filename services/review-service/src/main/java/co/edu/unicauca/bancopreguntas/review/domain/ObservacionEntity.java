@@ -37,10 +37,11 @@ public class ObservacionEntity {
     }
 
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public Long getRevisionId() { return revisionId; }
     public Long getPreguntaId() { return preguntaId; }
     public String getTexto() { return texto; }
     public LocalDateTime getFecha() { return fecha; }
     public boolean isVisibleAutor() { return visibleAutor; }
+    public void setVisibleAutor(boolean visibleAutor) { this.visibleAutor = visibleAutor; }
 }
-
