@@ -16,8 +16,12 @@ import org.springframework.web.client.RestTemplate;
 import javax.crypto.SecretKey;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,6 +33,8 @@ class GatewaySecurityAndRoutingTest {
     private GatewayProperties properties;
     private JwtValidator jwtValidator;
     private GatewayRoutingController controller;
+    private KeyPair rsaKeyPair;
+    private AtomicReference<HttpHeaders> forwardedHeaders;
 
     private String createTestToken(Long userId, String username, String role) {
         return Jwts.builder()
@@ -40,16 +46,41 @@ class GatewaySecurityAndRoutingTest {
                 .compact();
     }
 
+    private String createRsaKeycloakToken(String username, String role, boolean expired) {
+        long now = System.currentTimeMillis();
+        long exp = expired ? now - 3600000 : now + 3600000;
+
+        Map<String, Object> realmAccess = Map.of("roles", List.of(role, "default-roles-saberpro"));
+
+        return Jwts.builder()
+                .header().keyId("keycloak-key-1").and()
+                .subject(username)
+                .claim("preferred_username", username)
+                .claim("realm_access", realmAccess)
+                .issuedAt(new Date(now))
+                .expiration(new Date(exp))
+                .signWith(rsaKeyPair.getPrivate(), Jwts.SIG.RS256)
+                .compact();
+    }
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         properties = new GatewayProperties();
         jwtValidator = new JwtValidator(SECRET);
 
-        // Stub RestTemplate que simula respuestas de los microservicios
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        rsaKeyPair = kpg.generateKeyPair();
+        jwtValidator.setRsaPublicKey(rsaKeyPair.getPublic());
+
+        forwardedHeaders = new AtomicReference<>();
+
+        // Stub RestTemplate que simula respuestas de los microservicios y captura cabeceras
         RestTemplate stubRestTemplate = new RestTemplate() {
             @Override
             public <T> ResponseEntity<T> exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity,
                     Class<T> responseType) {
+                forwardedHeaders.set(requestEntity.getHeaders());
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
                 headers.set(CorrelationFilter.CORRELATION_HEADER,
@@ -115,7 +146,6 @@ class GatewaySecurityAndRoutingTest {
         String target = controller.resolveTargetService("/preguntas/42/enviar-revision");
         assertEquals(properties.getLifecycle(), target,
                 "El endpoint enviar-revision debe ser dirigido a lifecycle-service");
-
     }
 
     @Test
@@ -187,5 +217,102 @@ class GatewaySecurityAndRoutingTest {
         ResponseEntity<?> response = controller.routeRequest(HttpMethod.POST, request, "{}".getBytes());
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    // =========================================================================
+    // HU7: Pruebas con Tokens Keycloak RS256 (HU7.S3.4, HU7.S4.4, HU7.S5.2)
+    // =========================================================================
+
+    @Test
+    @DisplayName("HU7.S3: Token Keycloak RS256 válido es validado y propaga cabeceras X-User-*")
+    void testKeycloakRsaTokenValido_propagaHeaders() {
+        String token = createRsaKeycloakToken("autor1", "AUTOR", false);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
+        request.addHeader("Authorization", "Bearer " + token);
+        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-rsa-1");
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(forwardedHeaders.get());
+        assertEquals("AUTOR", forwardedHeaders.get().getFirst("X-User-Role"));
+        assertEquals("autor1", forwardedHeaders.get().getFirst("X-User-Name"));
+        assertEquals("2", forwardedHeaders.get().getFirst("X-User-Id"));
+    }
+
+    @Test
+    @DisplayName("HU7.S3: Token Keycloak RS256 expirado responde 401 Unauthorized")
+    void testKeycloakRsaTokenExpirado_responde401() {
+        String token = createRsaKeycloakToken("autor1", "AUTOR", true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
+        request.addHeader("Authorization", "Bearer " + token);
+        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-rsa-exp");
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("HU7.S3: Token Keycloak RS256 con firma alterada responde 401 Unauthorized")
+    void testKeycloakRsaTokenFirmaAlterada_responde401() {
+        String token = createRsaKeycloakToken("autor1", "AUTOR", false);
+        // Alterar el payload del token
+        String[] parts = token.split("\\.");
+        String alteredToken = parts[0] + "." + parts[1] + "X." + parts[2];
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
+        request.addHeader("Authorization", "Bearer " + alteredToken);
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("HU7.S4: Revisor intentando consultar historial de pregunta responde 403 Forbidden")
+    void testRoleForbiddenRevisorAccessingHistorial() {
+        String tokenRevisor = createRsaKeycloakToken("revisor1", "REVISOR", false);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/revisiones/pregunta/10/historial");
+        request.addHeader("Authorization", "Bearer " + tokenRevisor);
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("HU7.S4: Autor consultando su historial responde 200 OK")
+    void testRoleAllowedAutorAccessingHistorial() {
+        String tokenAutor = createRsaKeycloakToken("autor1", "AUTOR", false);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/revisiones/pregunta/10/historial");
+        request.addHeader("Authorization", "Bearer " + tokenAutor);
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("HU7.S5.2: Intento de suplantación de identidad en cabeceras X-User-Id es ignorado y sobrescrito con el token")
+    void testSpoofedHeadersAreIgnoredAndOverwritten() {
+        String token = createRsaKeycloakToken("autor1", "AUTOR", false);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
+        request.addHeader("Authorization", "Bearer " + token);
+        // Cliente intenta inyectar rol de administrador y otro ID
+        request.addHeader("X-User-Id", "999");
+        request.addHeader("X-User-Role", "ADMINISTRADOR");
+
+        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(forwardedHeaders.get());
+        assertEquals("2", forwardedHeaders.get().getFirst("X-User-Id"), "El ID debe ser el del token autenticado (2), no el inyectado (999)");
+        assertEquals("AUTOR", forwardedHeaders.get().getFirst("X-User-Role"), "El rol debe ser el del token (AUTOR), no el inyectado (ADMINISTRADOR)");
     }
 }

@@ -12,6 +12,11 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * @deprecated En Sprint 3 (HU7), Keycloak asume la generación y firma autoritativa de tokens JWT mediante RS256.
+ * Esta clase se conserva como soporte para el fallback de autenticación legacy.
+ */
+@Deprecated(since = "2.0.0")
 @Component
 public class JwtUtil {
 
@@ -51,7 +56,7 @@ public class JwtUtil {
                 .getPayload();
     }
 
-    public boolean validateToken(String token) {
+    public boolean isValid(String token) {
         try {
             validateAndExtractClaims(token);
             return true;
@@ -60,4 +65,3 @@ public class JwtUtil {
         }
     }
 }
-
