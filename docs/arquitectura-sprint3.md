@@ -373,3 +373,4 @@ Push / PR → Checkout → Java 17 (Temurin) → mvn test (12 módulos) → Repo
 | 5 | GET al Gateway con Bearer token → 200 OK; sin token → 401 | HU7.S2.1 |
 | 6 | Conexión directa a puerto interno → rechazada (no expuesta) | HU7.S5.3 |
 | 7 | Registrar orden de arranque estable en 3 ciclos de `docker compose up/down` | HU9.S3.3 |
+
