@@ -20,14 +20,18 @@ spring:
 notification:
   email:
     provider: ${NOTIFICATION_EMAIL_PROVIDER:mock}
+  smtp:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASS:}
+    from: ${SMTP_FROM:notificaciones@unicauca.edu.co}
 
 springdoc:
   api-docs:
     path: /api-docs
   swagger-ui:
     path: /swagger-ui.html
-
-
 
 management:
   endpoints:

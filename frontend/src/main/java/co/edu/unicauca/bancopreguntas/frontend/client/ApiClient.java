@@ -210,6 +210,34 @@ public class ApiClient {
     }
 
     public List<RevisionItemDTO> listarRevisionesAsignadas() throws IOException, ApiException {
+        return listarRevisionesAsignadas(0, 50, null, null, null);
+    }
+
+    public List<RevisionItemDTO> listarRevisionesAsignadas(int page, int size, String estado, String dificultad, String competencia)
+            throws IOException, ApiException {
+        StringBuilder sb = new StringBuilder("/revisiones/asignadas?page=").append(page).append("&size=").append(size);
+        if (estado != null && !estado.isBlank() && !"Todos".equalsIgnoreCase(estado)) {
+            sb.append("&estado=").append(URLEncoder.encode(estado, StandardCharsets.UTF_8));
+        }
+        if (dificultad != null && !dificultad.isBlank() && !"Todos".equalsIgnoreCase(dificultad)) {
+            sb.append("&dificultad=").append(URLEncoder.encode(dificultad, StandardCharsets.UTF_8));
+        }
+        if (competencia != null && !competencia.isBlank() && !"Todos".equalsIgnoreCase(competencia)) {
+            sb.append("&competencia=").append(URLEncoder.encode(competencia, StandardCharsets.UTF_8));
+        }
+        HttpResponseData response = sendGet(sb.toString(), true);
+        if (response.getStatusCode() == 200) {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            if (root.has("content")) {
+                return objectMapper.readValue(root.get("content").toString(),
+                        new TypeReference<List<RevisionItemDTO>>() {});
+            }
+            return objectMapper.readValue(response.getBody(), new TypeReference<List<RevisionItemDTO>>() {});
+        }
+        throw handleApiError(response);
+    }
+
+    public List<RevisionItemDTO> listarRevisionesAsignadasLegacy() throws IOException, ApiException {
         HttpResponseData response = sendGet("/revisiones/asignadas", true);
         if (response.getStatusCode() == 200) {
             // El backend devuelve objeto paginado: { "content": [...], "totalPages": N, ... }

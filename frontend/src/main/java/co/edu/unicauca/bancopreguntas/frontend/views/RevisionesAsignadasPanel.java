@@ -16,15 +16,71 @@ public class RevisionesAsignadasPanel extends JPanel {
     private final DefaultTableModel modelRevisiones;
     private final List<RevisionItemDTO> revisionesActuales = new ArrayList<>();
 
+    private final JComboBox<String> cmbEstado;
+    private final JComboBox<String> cmbDificultad;
+    private final JTextField txtCompetencia;
+    private final JLabel lblPagina;
+    private int paginaActual = 0;
+    private final int tamanoPagina = 10;
+
     public RevisionesAsignadasPanel() {
         setLayout(new BorderLayout(10, 10));
         setBackground(UIUtils.COLOR_BACKGROUND);
         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
+        // Cabecera y Filtros (HU12)
+        JPanel pnlNorte = new JPanel(new BorderLayout(5, 5));
+        pnlNorte.setOpaque(false);
+
         JLabel lblTitulo = new JLabel("Mis Revisiones Asignadas (Rol Revisor)", SwingConstants.CENTER);
         lblTitulo.setFont(UIUtils.FONT_TITLE);
         lblTitulo.setForeground(UIUtils.COLOR_PRIMARY);
-        add(lblTitulo, BorderLayout.NORTH);
+        pnlNorte.add(lblTitulo, BorderLayout.NORTH);
+
+        JPanel pnlFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        pnlFiltros.setBackground(UIUtils.COLOR_SURFACE);
+        pnlFiltros.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UIUtils.COLOR_BORDER),
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        ));
+
+        cmbEstado = new JComboBox<>(new String[]{"Todos", "ASIGNADA", "EVALUADA", "APROBADA", "RECHAZADA", "CERRADA_POR_RECHAZO"});
+        UIUtils.stylizeTextField(cmbEstado);
+
+        cmbDificultad = new JComboBox<>(new String[]{"Todos", "Bajo", "Medio", "Alto"});
+        UIUtils.stylizeTextField(cmbDificultad);
+
+        txtCompetencia = new JTextField(12);
+        UIUtils.stylizeTextField(txtCompetencia);
+
+        JButton btnFiltrar = new JButton("Filtrar");
+        UIUtils.stylizePrimaryButton(btnFiltrar);
+        btnFiltrar.addActionListener(e -> {
+            paginaActual = 0;
+            cargarDatos();
+        });
+
+        JButton btnLimpiar = new JButton("Limpiar");
+        UIUtils.stylizeSecondaryButton(btnLimpiar);
+        btnLimpiar.addActionListener(e -> {
+            cmbEstado.setSelectedIndex(0);
+            cmbDificultad.setSelectedIndex(0);
+            txtCompetencia.setText("");
+            paginaActual = 0;
+            cargarDatos();
+        });
+
+        pnlFiltros.add(new JLabel("Estado:"));
+        pnlFiltros.add(cmbEstado);
+        pnlFiltros.add(new JLabel("Dificultad:"));
+        pnlFiltros.add(cmbDificultad);
+        pnlFiltros.add(new JLabel("Competencia:"));
+        pnlFiltros.add(txtCompetencia);
+        pnlFiltros.add(btnFiltrar);
+        pnlFiltros.add(btnLimpiar);
+
+        pnlNorte.add(pnlFiltros, BorderLayout.SOUTH);
+        add(pnlNorte, BorderLayout.NORTH);
 
         modelRevisiones = new DefaultTableModel(new Object[]{
                 "ID Revisión", "ID Pregunta", "Título / Contexto", "Estado Revisión", "Fecha Asignación"
@@ -42,6 +98,37 @@ public class RevisionesAsignadasPanel extends JPanel {
 
         add(new JScrollPane(tablaRevisiones), BorderLayout.CENTER);
 
+        JPanel panelInferior = new JPanel(new BorderLayout(5, 5));
+        panelInferior.setOpaque(false);
+
+        // Controles de Paginación
+        JPanel pnlPaginacion = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
+        pnlPaginacion.setOpaque(false);
+
+        JButton btnAnterior = new JButton("◀ Anterior");
+        UIUtils.stylizeSecondaryButton(btnAnterior);
+        btnAnterior.addActionListener(e -> {
+            if (paginaActual > 0) {
+                paginaActual--;
+                cargarDatos();
+            }
+        });
+
+        lblPagina = new JLabel("Página " + (paginaActual + 1));
+        lblPagina.setFont(UIUtils.FONT_SUBTITLE);
+
+        JButton btnSiguiente = new JButton("Siguiente ▶");
+        UIUtils.stylizeSecondaryButton(btnSiguiente);
+        btnSiguiente.addActionListener(e -> {
+            paginaActual++;
+            cargarDatos();
+        });
+
+        pnlPaginacion.add(btnAnterior);
+        pnlPaginacion.add(lblPagina);
+        pnlPaginacion.add(btnSiguiente);
+        panelInferior.add(pnlPaginacion, BorderLayout.WEST);
+
         JPanel panelAcciones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 8));
         panelAcciones.setOpaque(false);
 
@@ -55,15 +142,25 @@ public class RevisionesAsignadasPanel extends JPanel {
 
         panelAcciones.add(btnRefrescar);
         panelAcciones.add(btnEvaluar);
-        add(panelAcciones, BorderLayout.SOUTH);
+        panelInferior.add(panelAcciones, BorderLayout.EAST);
+
+        add(panelInferior, BorderLayout.SOUTH);
     }
 
     public void cargarDatos() {
         SwingUtilities.invokeLater(() -> {
             try {
-                List<RevisionItemDTO> lista = ApiClient.getInstance().listarRevisionesAsignadas();
+                String estado = (String) cmbEstado.getSelectedItem();
+                String dificultad = (String) cmbDificultad.getSelectedItem();
+                String competencia = txtCompetencia.getText().trim();
+
+                List<RevisionItemDTO> lista = ApiClient.getInstance().listarRevisionesAsignadas(
+                        paginaActual, tamanoPagina, estado, dificultad, competencia
+                );
                 revisionesActuales.clear();
                 revisionesActuales.addAll(lista);
+
+                lblPagina.setText("Página " + (paginaActual + 1) + " (" + lista.size() + " items)");
 
                 modelRevisiones.setRowCount(0);
                 for (RevisionItemDTO r : lista) {
@@ -188,4 +285,3 @@ public class RevisionesAsignadasPanel extends JPanel {
         dialog.setVisible(true);
     }
 }
-

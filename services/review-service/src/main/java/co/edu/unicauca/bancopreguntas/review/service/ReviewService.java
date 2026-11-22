@@ -101,7 +101,8 @@ public class ReviewService {
             // Prevenir asignaciones duplicadas o reactivar si ya existía previamente
             Optional<RevisionEntity> existente = revisionRepository.findByPreguntaIdAndRevisorId(preguntaId, revId);
             if (existente.isEmpty()) {
-                RevisionEntity rev = new RevisionEntity(preguntaId, revId, user.getNombreCompleto(), user.getEmail());
+                RevisionEntity rev = new RevisionEntity(preguntaId, revId, user.getNombreCompleto(), user.getEmail(),
+                        pregunta.getCompetencia(), pregunta.getNivelDificultad());
                 RevisionEntity guardada = revisionRepository.save(rev);
                 asignacionesCreadas.add(guardada);
             } else {
@@ -109,6 +110,8 @@ public class ReviewService {
                 rev.setEstado(EstadoRevision.ASIGNADA);
                 rev.setFechaAsignacion(LocalDateTime.now());
                 rev.setFechaDecision(null);
+                rev.setCompetencia(pregunta.getCompetencia());
+                rev.setNivelDificultad(pregunta.getNivelDificultad());
                 RevisionEntity guardada = revisionRepository.save(rev);
                 asignacionesCreadas.add(guardada);
             }
@@ -137,36 +140,38 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> listarAsignadas(Long revisorId, int page, int size, String dificultad,
-            String competencia) {
+    public Map<String, Object> listarAsignadas(Long revisorId, int page, int size, String estadoStr,
+            String dificultad, String competencia) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size));
-        Page<RevisionEntity> revPage = revisionRepository.findByRevisorId(revisorId, pageable);
+
+        EstadoRevision estado = null;
+        if (estadoStr != null && !estadoStr.isBlank() && !"TODOS".equalsIgnoreCase(estadoStr)) {
+            try {
+                estado = EstadoRevision.valueOf(estadoStr.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
+        }
+
+        String difParam = (dificultad != null && !dificultad.isBlank() && !"TODOS".equalsIgnoreCase(dificultad))
+                ? dificultad.trim() : null;
+        String compParam = (competencia != null && !competencia.isBlank() && !"TODOS".equalsIgnoreCase(competencia))
+                ? competencia.trim() : null;
+
+        Page<RevisionEntity> revPage = revisionRepository.findByRevisorIdWithFilters(revisorId, estado, compParam, difParam, pageable);
 
         List<Map<String, Object>> resultList = new ArrayList<>();
         for (RevisionEntity rev : revPage.getContent()) {
             Optional<PreguntaDTO> pOpt = questionsClient.obtenerPregunta(rev.getPreguntaId());
             if (pOpt.isPresent()) {
                 PreguntaDTO p = pOpt.get();
-
-                // Filtro en memoria opcional por dificultad o competencia si se solicita
-                if (dificultad != null && !"TODOS".equalsIgnoreCase(dificultad)
-                        && !dificultad.equalsIgnoreCase(p.getNivelDificultad())) {
-                    continue;
-                }
-                if (competencia != null && !competencia.isBlank()
-                        && !competencia.equalsIgnoreCase(p.getCompetencia())) {
-                    continue;
-                }
-
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("revisionId", rev.getId());
                 item.put("preguntaId", p.getId());
                 item.put("contexto", p.getContexto());
                 item.put("preguntaDirecta", p.getPreguntaDirecta());
-                item.put("competencia", p.getCompetencia());
+                item.put("competencia", p.getCompetencia() != null ? p.getCompetencia() : rev.getCompetencia());
                 item.put("tema", p.getTema());
                 item.put("subtema", p.getSubtema());
-                item.put("nivelDificultad", p.getNivelDificultad());
+                item.put("nivelDificultad", p.getNivelDificultad() != null ? p.getNivelDificultad() : rev.getNivelDificultad());
                 item.put("estadoRevision", rev.getEstado().name());
                 item.put("estadoPregunta", p.getEstado());
                 item.put("estadoColor", p.getEstadoColor());
@@ -184,6 +189,12 @@ public class ReviewService {
         response.put("totalElements", revPage.getTotalElements());
         response.put("totalPages", revPage.getTotalPages());
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> listarAsignadas(Long revisorId, int page, int size, String dificultad,
+            String competencia) {
+        return listarAsignadas(revisorId, page, size, null, dificultad, competencia);
     }
 
     @Transactional
@@ -242,6 +253,12 @@ public class ReviewService {
         PreguntaDTO pregunta = questionsClient.obtenerPregunta(preguntaId)
                 .orElseThrow(() -> new IllegalArgumentException("Pregunta no encontrada"));
 
+        // Obtener correo real del autor desde Users Service (HU12)
+        String autorEmail = usersClient.buscarPorId(pregunta.getAutorId())
+                .map(UserSummaryDTO::getEmail)
+                .filter(e -> e != null && !e.isBlank())
+                .orElse("autor@unicauca.edu.co");
+
         if ("RECHAZAR".equals(decision) || "RECHAZADA".equals(decision)) {
             // HU5 - SSCRUM-65: Para rechazar debe existir al menos una observación no vacía
             List<ObservacionEntity> obsGuardadas = observacionRepository.findByRevisionId(revisionId);
@@ -280,7 +297,7 @@ public class ReviewService {
                     .stream().map(ObservacionEntity::getTexto).collect(Collectors.toList());
 
             // Coordinar con Lifecycle Service
-            lifecycleClient.aplicarDecision(preguntaId, "RECHAZADA", revisorId, "autor@unicauca.edu.co",
+            lifecycleClient.aplicarDecision(preguntaId, "RECHAZADA", revisorId, autorEmail,
                     pregunta.getContexto(), todasLasObservaciones, correlationId);
 
             // Actualizar proyección en Questions Service
@@ -288,7 +305,7 @@ public class ReviewService {
 
             // Evento PreguntaRechazada
             PreguntaRechazadaEvent rechazoEvent = new PreguntaRechazadaEvent(
-                    preguntaId, pregunta.getAutorId(), pregunta.getAutorNombre(), "autor@unicauca.edu.co",
+                    preguntaId, pregunta.getAutorId(), pregunta.getAutorNombre(), autorEmail,
                     pregunta.getContexto(), todasLasObservaciones, correlationId
             );
             eventPublisher.publish(rechazoEvent);
@@ -303,13 +320,13 @@ public class ReviewService {
             boolean todosAprobaron = todasRevisiones.stream().allMatch(r -> r.getEstado() == EstadoRevision.APROBADA);
 
             if (todosAprobaron) {
-                lifecycleClient.aplicarDecision(preguntaId, "APROBADA", revisorId, "autor@unicauca.edu.co",
+                lifecycleClient.aplicarDecision(preguntaId, "APROBADA", revisorId, autorEmail,
                         pregunta.getContexto(), Collections.emptyList(), correlationId);
 
                 questionsClient.actualizarProyeccionEstado(preguntaId, "APROBADA");
 
                 PreguntaAprobadaEvent aprobadaEvent = new PreguntaAprobadaEvent(
-                        preguntaId, pregunta.getAutorId(), pregunta.getAutorNombre(), "autor@unicauca.edu.co",
+                        preguntaId, pregunta.getAutorId(), pregunta.getAutorNombre(), autorEmail,
                         pregunta.getContexto(), "Pregunta aprobada por todos los revisores", correlationId
                 );
 

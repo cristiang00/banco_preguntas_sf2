@@ -25,6 +25,12 @@ public class RevisionEntity {
     @Column(name = "revisor_email", length = 150)
     private String revisorEmail;
 
+    @Column(name = "competencia", length = 100)
+    private String competencia;
+
+    @Column(name = "nivel_dificultad", length = 50)
+    private String nivelDificultad;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 50)
     private EstadoRevision estado = EstadoRevision.ASIGNADA;
@@ -46,6 +52,13 @@ public class RevisionEntity {
         this.fechaAsignacion = LocalDateTime.now();
     }
 
+    public RevisionEntity(Long preguntaId, Long revisorId, String revisorNombre, String revisorEmail,
+                          String competencia, String nivelDificultad) {
+        this(preguntaId, revisorId, revisorNombre, revisorEmail);
+        this.competencia = competencia;
+        this.nivelDificultad = nivelDificultad;
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -61,6 +74,12 @@ public class RevisionEntity {
     public String getRevisorEmail() { return revisorEmail; }
     public void setRevisorEmail(String revisorEmail) { this.revisorEmail = revisorEmail; }
 
+    public String getCompetencia() { return competencia; }
+    public void setCompetencia(String competencia) { this.competencia = competencia; }
+
+    public String getNivelDificultad() { return nivelDificultad; }
+    public void setNivelDificultad(String nivelDificultad) { this.nivelDificultad = nivelDificultad; }
+
     public EstadoRevision getEstado() { return estado; }
     public void setEstado(EstadoRevision estado) { this.estado = estado; }
 
@@ -70,4 +89,3 @@ public class RevisionEntity {
     public LocalDateTime getFechaDecision() { return fechaDecision; }
     public void setFechaDecision(LocalDateTime fechaDecision) { this.fechaDecision = fechaDecision; }
 }
-

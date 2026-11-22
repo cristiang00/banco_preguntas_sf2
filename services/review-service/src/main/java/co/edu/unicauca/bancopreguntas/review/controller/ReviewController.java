@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/revisiones")
-@Tag(name = "Revisiones", description = "Asignación de revisores, listado asignado, evaluaciones y decisiones con consenso")
+@Tag(name = "Revisiones", description = "Endpoints para el flujo de revisión por pares, asignación y evaluación")
 public class ReviewController {
 
     private final ReviewService reviewService;
@@ -77,18 +77,24 @@ public class ReviewController {
     }
 
     @GetMapping("/asignadas")
-    @Operation(summary = "Listar preguntas asignadas al revisor autenticado con paginación y filtros (HU5 - SSCRUM-62)")
+    @Operation(summary = "Listar preguntas asignadas al revisor autenticado con paginación y filtros (HU5 / HU12)",
+               description = "Permite filtrar por estado de revisión, dificultad y competencia antes de paginar para totales exactos")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Listado paginado de revisiones"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado: rol Revisor requerido")
+    })
     public ResponseEntity<?> listarAsignadas(
             @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId,
             @RequestHeader(value = "X-User-Role", defaultValue = "REVISOR") String userRole,
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "10") int size,
+            @RequestParam(value = "estado", required = false) String estado,
             @RequestParam(value = "dificultad", required = false) String dificultad,
             @RequestParam(value = "competencia", required = false) String competencia) {
         if (!"REVISOR".equalsIgnoreCase(userRole)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Acceso exclusivo para usuarios con rol Revisor"));
         }
-        return ResponseEntity.ok(reviewService.listarAsignadas(revisorId, page, size, dificultad, competencia));
+        return ResponseEntity.ok(reviewService.listarAsignadas(revisorId, page, size, estado, dificultad, competencia));
     }
 
     @PostMapping("/{id}/evaluacion")
@@ -130,9 +136,8 @@ public class ReviewController {
         try {
             RevisionEntity rev = reviewService.registrarDecision(id, request, revisorId, correlationId);
             return ResponseEntity.ok(Map.of(
-                    "revisionId", rev.getId(),
-                    "estadoRevision", rev.getEstado().name(),
-                    "mensaje", "Decisión registrada correctamente"
+                    "mensaje", "Decisión registrada exitosamente",
+                    "estadoRevision", rev.getEstado().name()
             ));
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
@@ -143,9 +148,9 @@ public class ReviewController {
         }
     }
 
-    @GetMapping("/pregunta/{preguntaId}/observaciones")
-    @Operation(summary = "Consultar observaciones de revisores visibles para el autor")
-    public ResponseEntity<List<ObservacionEntity>> listarObservaciones(@PathVariable(value = "preguntaId") Long preguntaId) {
-        return ResponseEntity.ok(reviewService.listarObservaciones(preguntaId));
+    @GetMapping("/pregunta/{id}/observaciones")
+    @Operation(summary = "Consultar observaciones visibles para el Autor de una pregunta rechazada")
+    public ResponseEntity<List<ObservacionEntity>> listarObservaciones(@PathVariable(value = "id") Long id) {
+        return ResponseEntity.ok(reviewService.listarObservaciones(id));
     }
 }
