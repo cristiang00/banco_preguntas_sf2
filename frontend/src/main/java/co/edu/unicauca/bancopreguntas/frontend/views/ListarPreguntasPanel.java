@@ -177,6 +177,19 @@ public class ListarPreguntasPanel extends JPanel {
 
         panelAcciones.add(btnRefrescar);
         panelAcciones.add(btnDetalle);
+
+        JButton btnHistorial = new JButton("Ver Historial");
+        UIUtils.stylizeSecondaryButton(btnHistorial);
+        btnHistorial.addActionListener(e -> {
+            int row = tabla.getSelectedRow();
+            if (row != -1) {
+                PreguntaDTO p = preguntasActuales.get(row);
+                new HistorialRevisionesDialog((Frame) SwingUtilities.getWindowAncestor(this), p.getId()).setVisible(true);
+            } else {
+                JOptionPane.showMessageDialog(this, "Seleccione una pregunta para consultar su historial de revisiones.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            }
+        });
+        panelAcciones.add(btnHistorial);
         panelAcciones.add(btnEnviarRevision);
         panelInferior.add(panelAcciones, BorderLayout.EAST);
 

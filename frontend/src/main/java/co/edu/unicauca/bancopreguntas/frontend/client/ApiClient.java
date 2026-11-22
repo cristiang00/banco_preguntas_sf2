@@ -262,6 +262,16 @@ public class ApiClient {
         }
     }
 
+    public Map<String, Object> consultarHistorialRevisiones(Long preguntaId, int page, int size)
+            throws IOException, ApiException {
+        String path = "/revisiones/pregunta/" + preguntaId + "/historial?page=" + page + "&size=" + size;
+        HttpResponseData response = sendGet(path, true);
+        if (response.getStatusCode() == 200) {
+            return objectMapper.readValue(response.getBody(), new TypeReference<Map<String, Object>>() {});
+        }
+        throw handleApiError(response);
+    }
+
     public List<String> obtenerObservaciones(Long preguntaId) throws IOException, ApiException {
         HttpResponseData response = sendGet("/revisiones/pregunta/" + preguntaId + "/observaciones", true);
         if (response.getStatusCode() == 200) {

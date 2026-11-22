@@ -98,22 +98,22 @@
 ---
 
 ### HU6: Historial de revisiones y versión mejorada (8 pts)
-- [ ] **HU6.S1.1** [PARCIAL] Microservicio de Revisión: consulta de historial agrupando evaluaciones y observaciones.  
-  *Evidencia:* Lógica diseñada en `ConsultarHistorialUseCase.java`; falta conectarla al endpoint y BD.
-- [ ] **HU6.S1.2** [PENDIENTE] Implementar endpoint `GET /revisiones/pregunta/{id}/historial` con paginación y Swagger.  
-  *Falta:* Agregar mapping en `ReviewController.java`.
-- [ ] **HU6.S1.3** [PENDIENTE] Panel de historial en frontend con tabla, estados de color y detalle de observaciones vía gateway.  
-  *Falta:* Clase Swing `HistorialRevisionesDialog.java` o panel en `frontend`.
-- [ ] **HU6.S1.4** [PENDIENTE] Pruebas unitarias de consulta de historial.  
-  *Falta:* Test en `ReviewServiceTest` / `ConsultarHistorialUseCaseTest`.
-- [ ] **HU6.S2.1** [PARCIAL] Validar autoría consultando a Preguntas que el autor sea el usuario del token.  
-  *Evidencia:* Validado conceptualmente en `ConsultarHistorialUseCase.java`.
-- [ ] **HU6.S2.2** [PENDIENTE] Retornar 403 con mensaje claro y documentar en Swagger.  
-  *Falta:* Exponer y documentar 403 en `ReviewController.java`.
-- [ ] **HU6.S2.3** [PENDIENTE] Mostrar mensaje de falta de permisos en el frontend.  
-  *Falta:* Manejo de 403 en diálogo del frontend.
-- [ ] **HU6.S2.4** [PENDIENTE] Pruebas unitarias automatizadas de validación de autoría.  
-  *Falta:* Test que verifique el 403 al consultar historial de pregunta ajena.
+- [x] **HU6.S1.1** [HECHO] Microservicio de Revisión: consulta de historial agrupando evaluaciones y observaciones por ronda.  
+  *Evidencia:* `ConsultarHistorialUseCase.java` agrupa revisiones cronológicas con sus observaciones visibles.
+- [x] **HU6.S1.2** [HECHO] Endpoint `GET /revisiones/pregunta/{id}/historial` con paginación y Swagger.  
+  *Evidencia:* `ReviewController.consultarHistorial(...)` con anotaciones `@Operation`, `@ApiResponses` (200, 403, 404) y paginación.
+- [x] **HU6.S1.3** [HECHO] Panel de historial en frontend con tabla, estados de color y detalle de observaciones vía gateway.  
+  *Evidencia:* `HistorialRevisionesDialog.java` implementado con tabla, renderizador de colores, detalle y controles de paginación; integrado en `ListarPreguntasPanel` y `DetallePreguntaDialog`.
+- [x] **HU6.S1.4** [HECHO] Pruebas unitarias de consulta de historial.  
+  *Evidencia:* `ReviewHexagonalUseCaseTest.testConsultarHistorialAutorExitoso()`.
+- [x] **HU6.S2.1** [HECHO] Validar autoría consultando a Preguntas que el autor sea el usuario del token.  
+  *Evidencia:* `ConsultarHistorialUseCase` compara `pregunta.getAutorId()` contra `usuarioAutenticadoId`.
+- [x] **HU6.S2.2** [HECHO] Retornar 403 con mensaje claro y documentar en Swagger.  
+  *Evidencia:* `ReviewController` captura `SecurityException` y responde 403 con `{"error": "Acceso denegado: solo el autor..."}`.
+- [x] **HU6.S2.3** [HECHO] Mostrar mensaje de falta de permisos en el frontend.  
+  *Evidencia:* `HistorialRevisionesDialog` captura `ApiException (403)` y muestra diálogo amigable de advertencia de permisos.
+- [x] **HU6.S2.4** [HECHO] Pruebas unitarias automatizadas de validación de autoría.  
+  *Evidencia:* `ReviewHexagonalUseCaseTest.testConsultarHistorialNoAutorLanza403()`.
 - [ ] **HU6.S3.1** [PENDIENTE] Lifecycle: transición Rechazada -> Borrador en patrón State y registrar en historial de transiciones.  
   *Falta:* Modificar `RejectedState.java` y `LifecycleService.java`.
 - [ ] **HU6.S3.2** [PENDIENTE] Questions: número de versión y creación de nueva versión desde rechazada con validación HU1.  

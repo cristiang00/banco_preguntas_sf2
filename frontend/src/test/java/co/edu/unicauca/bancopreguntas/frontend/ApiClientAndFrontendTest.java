@@ -82,6 +82,13 @@ class ApiClientAndFrontendTest {
 
             NotificacionesPanel notif = new NotificacionesPanel();
             assertNotNull(notif);
+
+            try {
+                HistorialRevisionesDialog historial = new HistorialRevisionesDialog(null, 999L);
+                assertNotNull(historial);
+            } catch (HeadlessException ignored) {
+                // En entorno CI/headless, JDialog lanza HeadlessException al crear ventanas nativas
+            }
         });
     }
 }

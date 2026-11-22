@@ -56,3 +56,4 @@ public class ReviewUseCaseConfig {
         return new ConsultarHistorialUseCase(repositoryPort, preguntasClientPort);
     }
 }
+

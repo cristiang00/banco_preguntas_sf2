@@ -28,8 +28,7 @@ public class ConsultarHistorialUseCase {
                 .orElseThrow(() -> new IllegalArgumentException("La pregunta con ID " + preguntaId + " no existe"));
 
         // HU6 - Subtarea 2: Validación estricta de autoría
-        if (pregunta.getAutorId() != null && usuarioAutenticadoId != null
-                && !pregunta.getAutorId().equals(usuarioAutenticadoId)) {
+        if (pregunta.getAutorId() != null && (usuarioAutenticadoId == null || !pregunta.getAutorId().equals(usuarioAutenticadoId))) {
             throw new SecurityException("Acceso denegado: solo el autor de la pregunta puede consultar su historial de revisiones");
         }
 
@@ -84,4 +83,3 @@ public class ConsultarHistorialUseCase {
         return response;
     }
 }
-

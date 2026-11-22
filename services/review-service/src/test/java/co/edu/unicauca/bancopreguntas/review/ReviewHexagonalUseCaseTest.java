@@ -9,9 +9,11 @@ import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaRechazadaEvent;
 import co.edu.unicauca.bancopreguntas.contracts.events.RevisoresAsignadosEvent;
 import co.edu.unicauca.bancopreguntas.review.application.ports.output.*;
 import co.edu.unicauca.bancopreguntas.review.application.usecases.AsignarRevisoresUseCase;
+import co.edu.unicauca.bancopreguntas.review.application.usecases.ConsultarHistorialUseCase;
 import co.edu.unicauca.bancopreguntas.review.application.usecases.ListarAsignadasUseCase;
 import co.edu.unicauca.bancopreguntas.review.application.usecases.RegistrarDecisionUseCase;
 import co.edu.unicauca.bancopreguntas.review.domain.model.EstadoRevision;
+import co.edu.unicauca.bancopreguntas.review.domain.model.Observacion;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Revision;
 import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.memory.InMemoryRevisionRepositoryAdapter;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +56,7 @@ class ReviewHexagonalUseCaseTest {
     private AsignarRevisoresUseCase asignarRevisoresUseCase;
     private RegistrarDecisionUseCase registrarDecisionUseCase;
     private ListarAsignadasUseCase listarAsignadasUseCase;
+    private ConsultarHistorialUseCase consultarHistorialUseCase;
 
     @BeforeEach
     void setUp() {
@@ -65,6 +68,9 @@ class ReviewHexagonalUseCaseTest {
                 repositoryPort, preguntasClientPort, lifecycleClientPort, usuariosClientPort, eventPublisherPort
         );
         listarAsignadasUseCase = new ListarAsignadasUseCase(
+                repositoryPort, preguntasClientPort
+        );
+        consultarHistorialUseCase = new ConsultarHistorialUseCase(
                 repositoryPort, preguntasClientPort
         );
     }
@@ -185,5 +191,66 @@ class ReviewHexagonalUseCaseTest {
         assertEquals(1, content.size());
         assertEquals(401L, content.get(0).get("preguntaId"));
         assertEquals("ASIGNADA", content.get(0).get("estadoRevision"));
+    }
+
+    @Test
+    @DisplayName("ConsultarHistorialUseCase: el autor consulta su historial exitosamente con rondas y observaciones (HU6.S1)")
+    void testConsultarHistorialAutorExitoso() {
+        Long preguntaId = 500L;
+        Long autorId = 15L;
+        PreguntaDTO pregunta = new PreguntaDTO();
+        pregunta.setId(preguntaId);
+        pregunta.setAutorId(autorId);
+        pregunta.setAutorNombre("Autor Juan");
+        when(preguntasClientPort.obtenerPregunta(preguntaId)).thenReturn(Optional.of(pregunta));
+
+        Revision rev = Revision.crearNueva(preguntaId, 8L, "Revisor Carlos", "carlos@test.com", "Lectura", "Medio");
+        rev.rechazar();
+        Revision guardada = repositoryPort.save(rev);
+        repositoryPort.saveObservacion(Observacion.crear(guardada.getId(), preguntaId, "La justificación es incompleta"));
+
+        Map<String, Object> historial = consultarHistorialUseCase.execute(preguntaId, autorId, 0, 10);
+
+        assertNotNull(historial);
+        assertEquals(preguntaId, historial.get("preguntaId"));
+        assertEquals(autorId, historial.get("autorId"));
+        assertEquals(1, historial.get("totalElements"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> content = (List<Map<String, Object>>) historial.get("content");
+        assertEquals(1, content.size());
+        assertEquals("RECHAZADA", content.get(0).get("estado"));
+
+        @SuppressWarnings("unchecked")
+        List<String> obs = (List<String>) content.get(0).get("observaciones");
+        assertEquals(1, obs.size());
+        assertEquals("La justificación es incompleta", obs.get(0));
+    }
+
+    @Test
+    @DisplayName("ConsultarHistorialUseCase: un usuario que no es autor recibe SecurityException (403 Forbidden) (HU6.S2)")
+    void testConsultarHistorialNoAutorLanza403() {
+        Long preguntaId = 600L;
+        Long autorId = 20L;
+        Long otroUsuarioId = 99L;
+
+        PreguntaDTO pregunta = new PreguntaDTO();
+        pregunta.setId(preguntaId);
+        pregunta.setAutorId(autorId);
+        when(preguntasClientPort.obtenerPregunta(preguntaId)).thenReturn(Optional.of(pregunta));
+
+        SecurityException ex = assertThrows(SecurityException.class,
+                () -> consultarHistorialUseCase.execute(preguntaId, otroUsuarioId, 0, 10));
+        assertTrue(ex.getMessage().contains("Acceso denegado: solo el autor"));
+    }
+
+    @Test
+    @DisplayName("ConsultarHistorialUseCase: si la pregunta no existe lanza IllegalArgumentException (404)")
+    void testConsultarHistorialPreguntaInexistente() {
+        Long preguntaId = 9999L;
+        when(preguntasClientPort.obtenerPregunta(preguntaId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> consultarHistorialUseCase.execute(preguntaId, 1L, 0, 10));
     }
 }

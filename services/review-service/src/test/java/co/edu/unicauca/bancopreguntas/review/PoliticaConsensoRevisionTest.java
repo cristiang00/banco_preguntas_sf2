@@ -105,3 +105,4 @@ class PoliticaConsensoRevisionTest {
         assertEquals(4.5, eval.getCalificacion());
     }
 }
+

@@ -41,13 +41,13 @@ public class RevisionesAsignadasPanel extends JPanel {
         pnlFiltros.setBackground(UIUtils.COLOR_SURFACE);
         pnlFiltros.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(UIUtils.COLOR_BORDER),
-                BorderFactory.createEmptyBorder(4, 8, 4, 8)
-        ));
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)));
 
-        cmbEstado = new JComboBox<>(new String[]{"Todos", "ASIGNADA", "EVALUADA", "APROBADA", "RECHAZADA", "CERRADA_POR_RECHAZO"});
+        cmbEstado = new JComboBox<>(
+                new String[] { "Todos", "ASIGNADA", "EVALUADA", "APROBADA", "RECHAZADA", "CERRADA_POR_RECHAZO" });
         UIUtils.stylizeTextField(cmbEstado);
 
-        cmbDificultad = new JComboBox<>(new String[]{"Todos", "Bajo", "Medio", "Alto"});
+        cmbDificultad = new JComboBox<>(new String[] { "Todos", "Bajo", "Medio", "Alto" });
         UIUtils.stylizeTextField(cmbDificultad);
 
         txtCompetencia = new JTextField(12);
@@ -82,7 +82,7 @@ public class RevisionesAsignadasPanel extends JPanel {
         pnlNorte.add(pnlFiltros, BorderLayout.SOUTH);
         add(pnlNorte, BorderLayout.NORTH);
 
-        modelRevisiones = new DefaultTableModel(new Object[]{
+        modelRevisiones = new DefaultTableModel(new Object[] {
                 "ID Revisión", "ID Pregunta", "Título / Contexto", "Estado Revisión", "Fecha Asignación"
         }, 0) {
             @Override
@@ -155,8 +155,7 @@ public class RevisionesAsignadasPanel extends JPanel {
                 String competencia = txtCompetencia.getText().trim();
 
                 List<RevisionItemDTO> lista = ApiClient.getInstance().listarRevisionesAsignadas(
-                        paginaActual, tamanoPagina, estado, dificultad, competencia
-                );
+                        paginaActual, tamanoPagina, estado, dificultad, competencia);
                 revisionesActuales.clear();
                 revisionesActuales.addAll(lista);
 
@@ -164,7 +163,7 @@ public class RevisionesAsignadasPanel extends JPanel {
 
                 modelRevisiones.setRowCount(0);
                 for (RevisionItemDTO r : lista) {
-                    modelRevisiones.addRow(new Object[]{
+                    modelRevisiones.addRow(new Object[] {
                             r.getId(),
                             r.getPreguntaId(),
                             r.getContexto() != null ? r.getContexto() : r.getTituloPregunta(),
@@ -173,7 +172,8 @@ public class RevisionesAsignadasPanel extends JPanel {
                     });
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error cargando revisiones asignadas: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Error cargando revisiones asignadas: " + ex.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
         });
     }
@@ -181,17 +181,20 @@ public class RevisionesAsignadasPanel extends JPanel {
     private void abrirDialogoEvaluacion() {
         int row = tablaRevisiones.getSelectedRow();
         if (row == -1) {
-            JOptionPane.showMessageDialog(this, "Seleccione una revisión de la tabla.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Seleccione una revisión de la tabla.", "Aviso",
+                    JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         RevisionItemDTO rev = revisionesActuales.get(row);
         if ("FINALIZADA".equalsIgnoreCase(rev.getEstadoRevision())) {
-            JOptionPane.showMessageDialog(this, "Esta revisión ya ha sido finalizada con veredicto.", "Aviso", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Esta revisión ya ha sido finalizada con veredicto.", "Aviso",
+                    JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
-        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Evaluación de Pregunta #" + rev.getPreguntaId(), true);
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+                "Evaluación de Pregunta #" + rev.getPreguntaId(), true);
         dialog.setSize(520, 500);
         dialog.setLocationRelativeTo(this);
 
@@ -234,16 +237,21 @@ public class RevisionesAsignadasPanel extends JPanel {
         btnAprobar.setForeground(Color.WHITE);
         btnAprobar.setFont(UIUtils.FONT_SUBTITLE);
         btnAprobar.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(dialog, "¿Confirma la APROBACIÓN de la pregunta #" + rev.getPreguntaId() + "?", "Confirmar Aprobación", JOptionPane.YES_NO_OPTION);
+            int confirm = JOptionPane.showConfirmDialog(dialog,
+                    "¿Confirma la APROBACIÓN de la pregunta #" + rev.getPreguntaId() + "?", "Confirmar Aprobación",
+                    JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
                     String obs = txtObs.getText().trim();
-                    ApiClient.getInstance().emitirDecision(rev.getId(), "APROBADA", obs.isEmpty() ? "Cumple todos los criterios pedagógicos y técnicos." : obs);
-                    JOptionPane.showMessageDialog(dialog, "Pregunta aprobada exitosamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                    ApiClient.getInstance().emitirDecision(rev.getId(), "APROBADA",
+                            obs.isEmpty() ? "Cumple todos los criterios pedagógicos y técnicos." : obs);
+                    JOptionPane.showMessageDialog(dialog, "Pregunta aprobada exitosamente.", "Éxito",
+                            JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     cargarDatos();
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(dialog, "Error emitiendo decisión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(dialog, "Error emitiendo decisión: " + ex.getMessage(), "Error",
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
         });
@@ -256,18 +264,24 @@ public class RevisionesAsignadasPanel extends JPanel {
             String obs = txtObs.getText().trim();
             if (obs.isEmpty()) {
                 txtObs.setBorder(UIUtils.BORDER_ERROR);
-                JOptionPane.showMessageDialog(dialog, "Debe ingresar observaciones detalladas que justifiquen el rechazo de la pregunta.", "Validación Requerida", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(dialog,
+                        "Debe ingresar observaciones detalladas que justifiquen el rechazo de la pregunta.",
+                        "Validación Requerida", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            int confirm = JOptionPane.showConfirmDialog(dialog, "¿Confirma el RECHAZO de la pregunta #" + rev.getPreguntaId() + "?", "Confirmar Rechazo", JOptionPane.YES_NO_OPTION);
+            int confirm = JOptionPane.showConfirmDialog(dialog,
+                    "¿Confirma el RECHAZO de la pregunta #" + rev.getPreguntaId() + "?", "Confirmar Rechazo",
+                    JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
                     ApiClient.getInstance().emitirDecision(rev.getId(), "RECHAZADA", obs);
-                    JOptionPane.showMessageDialog(dialog, "Pregunta rechazada con observaciones registradas.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                    JOptionPane.showMessageDialog(dialog, "Pregunta rechazada con observaciones registradas.", "Éxito",
+                            JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     cargarDatos();
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(dialog, "Error emitiendo decisión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(dialog, "Error emitiendo decisión: " + ex.getMessage(), "Error",
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
         });

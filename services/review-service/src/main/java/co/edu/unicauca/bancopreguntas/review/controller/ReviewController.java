@@ -4,6 +4,7 @@ import co.edu.unicauca.bancopreguntas.contracts.dto.AsignarRevisoresRequestDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.DecisionRequestDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.EvaluacionRequestDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.PreguntaDTO;
+import co.edu.unicauca.bancopreguntas.review.application.usecases.ConsultarHistorialUseCase;
 import co.edu.unicauca.bancopreguntas.review.client.QuestionsServiceClient;
 import co.edu.unicauca.bancopreguntas.review.domain.EvaluacionRevisorEntity;
 import co.edu.unicauca.bancopreguntas.review.domain.ObservacionEntity;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,15 +25,19 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/revisiones")
-@Tag(name = "Revisiones", description = "Endpoints para el flujo de revisión por pares, asignación y evaluación")
+@Tag(name = "Revisiones", description = "Endpoints para el flujo de revisión por pares, asignación, evaluación e historial")
 public class ReviewController {
 
     private final ReviewService reviewService;
     private final QuestionsServiceClient questionsClient;
+    private final ConsultarHistorialUseCase consultarHistorialUseCase;
 
-    public ReviewController(ReviewService reviewService, QuestionsServiceClient questionsClient) {
+    public ReviewController(ReviewService reviewService,
+                            QuestionsServiceClient questionsClient,
+                            @Autowired(required = false) ConsultarHistorialUseCase consultarHistorialUseCase) {
         this.reviewService = reviewService;
         this.questionsClient = questionsClient;
+        this.consultarHistorialUseCase = consultarHistorialUseCase;
     }
 
     @PostMapping("/asignar")
@@ -152,5 +158,32 @@ public class ReviewController {
     @Operation(summary = "Consultar observaciones visibles para el Autor de una pregunta rechazada")
     public ResponseEntity<List<ObservacionEntity>> listarObservaciones(@PathVariable(value = "id") Long id) {
         return ResponseEntity.ok(reviewService.listarObservaciones(id));
+    }
+
+    @GetMapping("/pregunta/{id}/historial")
+    @Operation(summary = "Consultar historial de revisiones y observaciones por pregunta (HU6 - Subtareas 1 y 2)",
+               description = "Agrupa revisiones por ronda con revisor, decisión, fecha y observaciones. Solo el autor puede consultar.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado: solo el autor de la pregunta puede consultar su historial"),
+        @ApiResponse(responseCode = "404", description = "Pregunta no encontrada")
+    })
+    public ResponseEntity<?> consultarHistorial(
+            @PathVariable(value = "id") Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        if (consultarHistorialUseCase == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Caso de uso de historial no disponible"));
+        }
+        try {
+            Map<String, Object> historial = consultarHistorialUseCase.execute(id, userId, page, size);
+            return ResponseEntity.ok(historial);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
     }
 }

@@ -86,6 +86,13 @@ public class DetallePreguntaDialog extends JDialog {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
         btnPanel.setOpaque(false);
 
+        JButton btnHistorial = new JButton("Ver Historial");
+        UIUtils.stylizeSecondaryButton(btnHistorial);
+        btnHistorial.addActionListener(e -> {
+            new HistorialRevisionesDialog((Frame) SwingUtilities.getWindowAncestor(this), pregunta.getId()).setVisible(true);
+        });
+        btnPanel.add(btnHistorial);
+
         if ("BORRADOR".equalsIgnoreCase(pregunta.getEstado())) {
             JButton btnEnviar = new JButton("Enviar a Revisión");
             UIUtils.stylizePrimaryButton(btnEnviar);
