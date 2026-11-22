@@ -14,28 +14,45 @@ public class DetallePreguntaDialog extends JDialog {
     private final PreguntaDTO pregunta;
     private final Runnable onActualizado;
 
-    public DetallePreguntaDialog(Window parent, PreguntaDTO pregunta, Runnable onActualizado) {
-        super(parent, "Detalle de Pregunta #" + pregunta.getId(), ModalityType.APPLICATION_MODAL);
+    public DetallePreguntaDialog(Window owner, PreguntaDTO pregunta, Runnable onActualizado) {
+        super(owner, "Detalle de la Pregunta #" + (pregunta != null ? pregunta.getId() : ""), ModalityType.APPLICATION_MODAL);
         this.pregunta = pregunta;
         this.onActualizado = onActualizado;
-        inicializarUI();
+
+        if (pregunta == null) {
+            dispose();
+            return;
+        }
+
+        setSize(700, 680);
+        setLocationRelativeTo(owner);
+        initUI();
     }
 
-    private void inicializarUI() {
-        setSize(600, 720);
-        setLocationRelativeTo(getParent());
-
+    private void initUI() {
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-        mainPanel.setBackground(UIUtils.COLOR_SURFACE);
+        mainPanel.setBackground(UIUtils.COLOR_BACKGROUND);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
-        String estadoLabel = pregunta.getEstado() != null ? pregunta.getEstado() : "BORRADOR";
-        JLabel lblTitulo = new JLabel("Pregunta #" + pregunta.getId() + " - [" + estadoLabel + "]",
-                SwingConstants.CENTER);
+        // Cabecera con estado y versión
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setOpaque(false);
+        JLabel lblTitulo = new JLabel("Pregunta #" + pregunta.getId() + " (Versión " + pregunta.getVersion() + ")");
         lblTitulo.setFont(UIUtils.FONT_TITLE);
-        lblTitulo.setForeground(UIUtils.COLOR_PRIMARY);
-        mainPanel.add(lblTitulo, BorderLayout.NORTH);
+        lblTitulo.setForeground(UIUtils.COLOR_TEXT_PRIMARY);
 
+        JLabel lblEstado = new JLabel(" " + pregunta.getEstado() + " ");
+        lblEstado.setFont(UIUtils.FONT_SUBTITLE);
+        lblEstado.setOpaque(true);
+        lblEstado.setBackground(UIUtils.COLOR_SECONDARY);
+        lblEstado.setForeground(Color.WHITE);
+        lblEstado.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+
+        headerPanel.add(lblTitulo, BorderLayout.WEST);
+        headerPanel.add(lblEstado, BorderLayout.EAST);
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+
+        // Formulario / Datos
         JPanel infoPanel = new JPanel(new GridBagLayout());
         infoPanel.setBackground(UIUtils.COLOR_SURFACE);
         GridBagConstraints gbc = new GridBagConstraints();
@@ -44,6 +61,7 @@ public class DetallePreguntaDialog extends JDialog {
         gbc.anchor = GridBagConstraints.NORTHWEST;
 
         int y = 0;
+        addCampo(infoPanel, gbc, y++, "Versión Actual:", "v" + pregunta.getVersion());
         addCampo(infoPanel, gbc, y++, "Contexto:", pregunta.getContexto());
         addCampo(infoPanel, gbc, y++, "Pregunta Directa:", pregunta.getPreguntaDirecta());
 
@@ -100,6 +118,14 @@ public class DetallePreguntaDialog extends JDialog {
             btnPanel.add(btnEnviar);
         }
 
+        // HU6.S3.4: Botón "Crear versión mejorada" solo visible/habilitado cuando está Rechazada
+        if ("RECHAZADA".equalsIgnoreCase(pregunta.getEstado())) {
+            JButton btnNuevaVersion = new JButton("Crear versión mejorada");
+            UIUtils.stylizePrimaryButton(btnNuevaVersion);
+            btnNuevaVersion.addActionListener(e -> crearNuevaVersion());
+            btnPanel.add(btnNuevaVersion);
+        }
+
         JButton btnCerrar = new JButton("Cerrar");
         UIUtils.stylizeSecondaryButton(btnCerrar);
         btnCerrar.addActionListener(e -> dispose());
@@ -133,7 +159,7 @@ public class DetallePreguntaDialog extends JDialog {
     private void enviarARevision() {
         int confirm = JOptionPane.showConfirmDialog(
                 this,
-                "¿Está seguro de enviar la pregunta #" + pregunta.getId() + " a revisión?\n"
+                "¿Está seguro de enviar la pregunta #" + pregunta.getId() + " (v" + pregunta.getVersion() + ") a revisión?\n"
                         + "Una vez enviada, no podrá modificarla hasta que concluya el proceso de evaluación.",
                 "Confirmar Envío",
                 JOptionPane.YES_NO_OPTION,
@@ -148,6 +174,30 @@ public class DetallePreguntaDialog extends JDialog {
                 dispose();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Error enviando a revisión: " + ex.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void crearNuevaVersion() {
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "¿Desea crear una nueva versión mejorada de la pregunta #" + pregunta.getId() + "?\n"
+                        + "La pregunta pasará al estado BORRADOR (Versión " + (pregunta.getVersion() + 1) + ") y podrá ser editada y reenviada.",
+                "Confirmar Nueva Versión",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                PreguntaDTO versionada = ApiClient.getInstance().crearNuevaVersion(pregunta.getId(), null);
+                JOptionPane.showMessageDialog(this,
+                        "Nueva versión " + versionada.getVersion() + " creada exitosamente en estado " + versionada.getEstado() + ".",
+                        "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                if (onActualizado != null)
+                    onActualizado.run();
+                dispose();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error al crear nueva versión: " + ex.getMessage(), "Error",
                         JOptionPane.ERROR_MESSAGE);
             }
         }

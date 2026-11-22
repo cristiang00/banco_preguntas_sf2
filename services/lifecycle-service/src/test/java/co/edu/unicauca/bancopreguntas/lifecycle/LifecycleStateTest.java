@@ -126,6 +126,7 @@ class LifecycleStateTest {
         assertEquals(preguntaId, event.getPreguntaId());
         assertEquals(autorId, event.getAutorId());
         assertEquals("corr-123", event.getCorrelationId());
+        assertEquals(1, event.getVersion());
     }
 
     @Test
@@ -189,5 +190,65 @@ class LifecycleStateTest {
         assertEquals("#DC3545", EstadoPreguntaDTO.RECHAZADA.getColorHex());
         assertEquals("Rechazada", EstadoPreguntaDTO.RECHAZADA.getLabel());
     }
-}
 
+    @Test
+    @DisplayName("HU6.S3 / HU6.S3.5: Transición exitosa Rechazada -> Borrador al crear nueva versión y registro en historial")
+    void crearNuevaVersion_rechazadaABorrador_exitoso() {
+        Long preguntaId = 201L;
+        Long autorId = 7L;
+        PreguntaCicloVidaEntity entity = new PreguntaCicloVidaEntity(preguntaId, autorId, EstadoPreguntaDTO.RECHAZADA);
+        cicloVidaRepo.save(entity);
+
+        EstadoPreguntaDTO nuevoEstado = service.crearNuevaVersion(preguntaId, autorId, "corr-nueva-version");
+
+        assertEquals(EstadoPreguntaDTO.BORRADOR, nuevoEstado);
+        assertEquals(EstadoPreguntaDTO.BORRADOR, entity.getEstado());
+        assertEquals(1, historialRepo.list.size());
+        HistorialTransicionEntity log = historialRepo.list.get(0);
+        assertEquals(EstadoPreguntaDTO.RECHAZADA, log.getEstadoOrigen());
+        assertEquals(EstadoPreguntaDTO.BORRADOR, log.getEstadoDestino());
+        assertEquals(autorId, log.getUsuarioId());
+        assertTrue(log.getMotivo().contains("nueva versión"));
+    }
+
+    @Test
+    @DisplayName("HU6.S4.4: Transición no permitida a nueva versión desde estados que no sean Rechazada (409)")
+    void crearNuevaVersion_desdeEstadosNoPermitidos_lanzaTransicionInvalidaException() {
+        Long autorId = 7L;
+
+        // Desde Borrador
+        PreguntaCicloVidaEntity enBorrador = new PreguntaCicloVidaEntity(202L, autorId, EstadoPreguntaDTO.BORRADOR);
+        cicloVidaRepo.save(enBorrador);
+        assertThrows(TransicionInvalidaException.class, () ->
+            service.crearNuevaVersion(202L, autorId, "corr-1")
+        );
+
+        // Desde Pendiente de Revisión
+        PreguntaCicloVidaEntity enPendiente = new PreguntaCicloVidaEntity(203L, autorId, EstadoPreguntaDTO.PENDIENTE_REVISION);
+        cicloVidaRepo.save(enPendiente);
+        assertThrows(TransicionInvalidaException.class, () ->
+            service.crearNuevaVersion(203L, autorId, "corr-2")
+        );
+
+        // Desde Aprobada
+        PreguntaCicloVidaEntity enAprobada = new PreguntaCicloVidaEntity(204L, autorId, EstadoPreguntaDTO.APROBADA);
+        cicloVidaRepo.save(enAprobada);
+        assertThrows(TransicionInvalidaException.class, () ->
+            service.crearNuevaVersion(204L, autorId, "corr-3")
+        );
+    }
+
+    @Test
+    @DisplayName("HU6.S2 / HU6.S4: Rechazo por falta de permisos si el usuario no es el autor al crear nueva versión (403)")
+    void crearNuevaVersion_noEsAutor_lanzaAccesoDenegado() {
+        Long preguntaId = 205L;
+        Long autorOriginalId = 7L;
+        Long otroUsuarioId = 99L;
+        PreguntaCicloVidaEntity entity = new PreguntaCicloVidaEntity(preguntaId, autorOriginalId, EstadoPreguntaDTO.RECHAZADA);
+        cicloVidaRepo.save(entity);
+
+        assertThrows(AccesoDenegadoException.class, () ->
+            service.crearNuevaVersion(preguntaId, otroUsuarioId, "corr-4")
+        );
+    }
+}

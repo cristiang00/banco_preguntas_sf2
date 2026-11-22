@@ -76,6 +76,7 @@ public class QuestionService {
                 .conAutorNombre(autorNombre)
                 .conEstado(EstadoPreguntaDTO.BORRADOR)
                 .conFechaCreacion(LocalDateTime.now())
+                .conVersion(1)
                 .build();
 
         // 3. Persistir entidad
@@ -132,6 +133,69 @@ public class QuestionService {
     }
 
     @Transactional
+    public PreguntaDTO crearNuevaVersion(Long id, PreguntaDTO dto, Long userId) {
+        PreguntaEntity entity = preguntaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("La pregunta con ID " + id + " no existe"));
+
+        // HU6.S2 / HU6.S3: Validar autoría
+        if (!entity.getAutorId().equals(userId)) {
+            throw new SecurityException("No tiene permisos para crear una nueva versión de esta pregunta");
+        }
+
+        // HU6.S4: Validar estado actual (solo permitido desde Rechazada)
+        if (entity.getEstadoProyeccion() != EstadoPreguntaDTO.RECHAZADA) {
+            throw new ConflictException("No se puede crear una nueva versión desde el estado '"
+                    + entity.getEstadoProyeccion().name() + "'. Solo está permitido desde estado 'RECHAZADA'");
+        }
+
+        // Si se proveen modificaciones en el cuerpo, validar estructuralmente (HU1 / HU6.S3)
+        if (dto != null && (dto.getContexto() != null || dto.getPreguntaDirecta() != null)) {
+            dto.setId(id);
+            if (dto.getCompetencia() == null) dto.setCompetencia(entity.getCompetencia());
+            if (dto.getTema() == null) dto.setTema(entity.getTema());
+            if (dto.getSubtema() == null) dto.setSubtema(entity.getSubtema());
+            if (dto.getNivelDificultad() == null) dto.setNivelDificultad(entity.getNivelDificultad());
+            if (dto.getRespuestaCorrecta() == null) dto.setRespuestaCorrecta(entity.getRespuestaCorrecta());
+            if (dto.getBibliografia() == null) dto.setBibliografia(entity.getBibliografia());
+            if (dto.getJustificacion() == null) dto.setJustificacion(entity.getJustificacion());
+
+            ResultadoValidacionDTO valResult = validationClient.validarPregunta(dto);
+            if (!valResult.isValido()) {
+                throw new ValidationException(valResult.getErrores());
+            }
+
+            if (dto.getContexto() != null) entity.setContexto(dto.getContexto());
+            if (dto.getPreguntaDirecta() != null) entity.setPreguntaDirecta(dto.getPreguntaDirecta());
+            if (dto.getRespuestaCorrecta() != null) entity.setRespuestaCorrecta(dto.getRespuestaCorrecta());
+            if (dto.getJustificacion() != null) entity.setJustificacion(dto.getJustificacion());
+            if (dto.getBibliografia() != null) entity.setBibliografia(dto.getBibliografia());
+            if (dto.getCompetencia() != null) entity.setCompetencia(dto.getCompetencia());
+            if (dto.getTema() != null) entity.setTema(dto.getTema());
+            if (dto.getSubtema() != null) entity.setSubtema(dto.getSubtema());
+            if (dto.getNivelDificultad() != null) entity.setNivelDificultad(dto.getNivelDificultad());
+
+            if (dto.getOpciones() != null && dto.getOpciones().size() == 4) {
+                entity.getOpciones().clear();
+                int orden = 1;
+                for (OpcionDTO op : dto.getOpciones()) {
+                    entity.getOpciones().add(new OpcionEntity(op.getClave(), op.getTexto(), orden++));
+                }
+            }
+        }
+
+        // HU6.S3: Incrementar versión y restablecer estado a Borrador
+        int nuevaVersion = (entity.getVersion() != null ? entity.getVersion() : 1) + 1;
+        entity.setVersion(nuevaVersion);
+        entity.setEstadoProyeccion(EstadoPreguntaDTO.BORRADOR);
+
+        // Notificar a Lifecycle Service la transición Rechazada -> Borrador
+        lifecycleClient.crearNuevaVersion(id, userId);
+
+        PreguntaEntity versionada = preguntaRepository.save(entity);
+        return queryFacade.toDTO(versionada);
+    }
+
+    @Transactional
     public void actualizarProyeccionEstado(Long preguntaId, EstadoPreguntaDTO nuevoEstado) {
         preguntaRepository.findById(preguntaId).ifPresent(p -> {
             p.setEstadoProyeccion(nuevoEstado);
@@ -147,4 +211,3 @@ public class QuestionService {
                 .collect(java.util.stream.Collectors.toList());
     }
 }
-

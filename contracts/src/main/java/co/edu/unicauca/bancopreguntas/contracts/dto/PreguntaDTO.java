@@ -23,6 +23,7 @@ public class PreguntaDTO implements Serializable {
     private String estado;
     private String estadoColor;
     private LocalDateTime fechaCreacion;
+    private Integer version = 1;
     private List<String> accionesPermitidas = new ArrayList<>();
     private List<String> observaciones = new ArrayList<>();
 
@@ -75,6 +76,9 @@ public class PreguntaDTO implements Serializable {
 
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
+
+    public Integer getVersion() { return version != null ? version : 1; }
+    public void setVersion(Integer version) { this.version = version; }
 
     public List<String> getAccionesPermitidas() { return accionesPermitidas; }
     public void setAccionesPermitidas(List<String> accionesPermitidas) { this.accionesPermitidas = accionesPermitidas; }

@@ -82,7 +82,7 @@ public class LifecycleService {
         EstadoPreguntaDTO estadoAnterior = entity.getEstado();
         QuestionState estadoActual = entity.getEstadoActual();
 
-        // SSCRUM-43: Aplicación del patrón State (lanza TransicionInvalidaException si no es Borrador)
+        // SSCRUM-43 / HU6.S5: Aplicación del patrón State (lanza TransicionInvalidaException si no es Borrador)
         estadoActual.submitForReview(entity);
 
         cicloVidaRepository.save(entity);
@@ -92,21 +92,67 @@ public class LifecycleService {
                 estadoAnterior,
                 entity.getEstado(),
                 usuarioAutenticadoId,
-                "Envío inicial a revisión por el autor"
+                "Envío a revisión por el autor"
         ));
 
-        // SSCRUM-42: Publicación del evento en el broker
+        // HU6.S5: Obtener número de versión si es posible
+        int version = 1;
+        if (questionsClient != null) {
+            try {
+                Integer v = questionsClient.obtenerVersion(preguntaId);
+                if (v != null) {
+                    version = v;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // SSCRUM-42 / HU6.S5: Publicación del evento en el broker con versión
         PreguntaEnviadaARevisionEvent event = new PreguntaEnviadaARevisionEvent(
                 preguntaId,
                 entity.getAutorId(),
                 autorNombre,
                 contexto,
                 preguntaDirecta,
+                version,
                 correlationId
         );
         eventPublisher.publish(event);
 
         // SSCRUM-HU4: Sincronización proactiva de proyección de estado en Questions Service
+        if (questionsClient != null) {
+            try {
+                questionsClient.actualizarProyeccionEstado(preguntaId, entity.getEstado().name());
+            } catch (Exception ignored) {}
+        }
+
+        return entity.getEstado();
+    }
+
+    @Transactional
+    public EstadoPreguntaDTO crearNuevaVersion(Long preguntaId, Long usuarioAutenticadoId, String correlationId) {
+        PreguntaCicloVidaEntity entity = cicloVidaRepository.findById(preguntaId)
+                .orElseThrow(() -> new IllegalArgumentException("La pregunta con ID " + preguntaId + " no existe"));
+
+        if (entity.getAutorId() != null && !entity.getAutorId().equals(usuarioAutenticadoId)) {
+            throw new AccesoDenegadoException("No tiene permisos para crear una nueva versión de una pregunta creada por otro autor");
+        }
+
+        EstadoPreguntaDTO estadoAnterior = entity.getEstado();
+        QuestionState estadoActual = entity.getEstadoActual();
+
+        // HU6.S3 / HU6.S4: Transición Rechazada -> Borrador (lanza TransicionInvalidaException si no es Rechazada)
+        estadoActual.createNewVersion(entity);
+
+        cicloVidaRepository.save(entity);
+
+        historialRepository.save(new HistorialTransicionEntity(
+                preguntaId,
+                estadoAnterior,
+                entity.getEstado(),
+                usuarioAutenticadoId,
+                "Creación de nueva versión mejorada (Rechazada -> Borrador)"
+        ));
+
         if (questionsClient != null) {
             try {
                 questionsClient.actualizarProyeccionEstado(preguntaId, entity.getEstado().name());

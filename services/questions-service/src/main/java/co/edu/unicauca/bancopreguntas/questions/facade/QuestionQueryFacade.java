@@ -37,7 +37,7 @@ public class QuestionQueryFacade {
 
     @Transactional(readOnly = true)
     public Map<String, Object> listarPreguntas(Long autorId, List<EstadoPreguntaDTO> estados, 
-                                               String dificultad, int page, int size) {
+                                                String dificultad, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "id"));
 
         Specification<PreguntaEntity> spec = (root, query, cb) -> {
@@ -116,6 +116,7 @@ public class QuestionQueryFacade {
         dto.setAutorId(entity.getAutorId());
         dto.setAutorNombre(entity.getAutorNombre());
         dto.setFechaCreacion(entity.getFechaCreacion());
+        dto.setVersion(entity.getVersion());
 
         EstadoPreguntaDTO estado = entity.getEstadoProyeccion() != null ? entity.getEstadoProyeccion() : EstadoPreguntaDTO.BORRADOR;
         dto.setEstado(estado.name());
@@ -141,9 +142,9 @@ public class QuestionQueryFacade {
             acciones.add("ENVIAR_REVISION");
         } else if (estado == EstadoPreguntaDTO.RECHAZADA) {
             acciones.add("VER_OBSERVACIONES");
+            acciones.add("CREAR_NUEVA_VERSION");
         }
 
         dto.setAccionesPermitidas(acciones);
     }
 }
-

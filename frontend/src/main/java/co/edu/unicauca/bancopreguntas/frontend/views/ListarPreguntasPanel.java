@@ -65,7 +65,7 @@ public class ListarPreguntasPanel extends JPanel {
         add(panelFiltros, BorderLayout.NORTH);
 
         // Tabla
-        tableModel = new DefaultTableModel(new Object[]{"ID", "Contexto / Enunciado", "Competencia", "Dificultad", "Estado"}, 0) {
+        tableModel = new DefaultTableModel(new Object[]{"ID", "Contexto / Enunciado", "Competencia", "Dificultad", "Estado", "Versión"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -160,7 +160,7 @@ public class ListarPreguntasPanel extends JPanel {
                     JOptionPane.showMessageDialog(this, "Solo las preguntas en estado BORRADOR pueden ser enviadas a revisión.", "Aviso", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
-                int confirm = JOptionPane.showConfirmDialog(this, "¿Desea enviar la pregunta #" + p.getId() + " a revisión?", "Confirmar Envío", JOptionPane.YES_NO_OPTION);
+                int confirm = JOptionPane.showConfirmDialog(this, "¿Desea enviar la pregunta #" + p.getId() + " (v" + p.getVersion() + ") a revisión?", "Confirmar Envío", JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
                     try {
                         ApiClient.getInstance().enviarARevision(p.getId());
@@ -190,6 +190,40 @@ public class ListarPreguntasPanel extends JPanel {
             }
         });
         panelAcciones.add(btnHistorial);
+
+        // HU6.S3.4 / HU6.S4.3: Botón Crear versión mejorada
+        JButton btnNuevaVersion = new JButton("Crear versión mejorada");
+        UIUtils.stylizePrimaryButton(btnNuevaVersion);
+        btnNuevaVersion.addActionListener(e -> {
+            int row = tabla.getSelectedRow();
+            if (row != -1) {
+                PreguntaDTO p = preguntasActuales.get(row);
+                if (!"RECHAZADA".equalsIgnoreCase(p.getEstado())) {
+                    JOptionPane.showMessageDialog(this,
+                            "La acción 'Crear versión mejorada' solo está permitida para preguntas en estado RECHAZADA. El estado actual es: " + p.getEstado(),
+                            "Acción no permitida", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                int confirm = JOptionPane.showConfirmDialog(this,
+                        "¿Desea crear una nueva versión mejorada de la pregunta #" + p.getId() + "?\nLa pregunta pasará al estado BORRADOR (v" + (p.getVersion() + 1) + ") para su posterior edición y reenvío.",
+                        "Confirmar Creación de Versión Mejorada", JOptionPane.YES_NO_OPTION);
+                if (confirm == JOptionPane.YES_OPTION) {
+                    try {
+                        PreguntaDTO versionada = ApiClient.getInstance().crearNuevaVersion(p.getId(), null);
+                        JOptionPane.showMessageDialog(this,
+                                "Nueva versión (v" + versionada.getVersion() + ") creada exitosamente en estado " + versionada.getEstado() + ".",
+                                "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                        cargarDatos();
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(this, "Error al crear nueva versión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Seleccione una pregunta rechazada de la tabla.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            }
+        });
+        panelAcciones.add(btnNuevaVersion);
+
         panelAcciones.add(btnEnviarRevision);
         panelInferior.add(panelAcciones, BorderLayout.EAST);
 
@@ -219,7 +253,8 @@ public class ListarPreguntasPanel extends JPanel {
                                 contextoCorto,
                                 p.getCompetencia(),
                                 p.getNivelDificultad(),
-                                p.getEstado()
+                                p.getEstado(),
+                                "v" + p.getVersion()
                         });
                     }
                 }
@@ -248,4 +283,3 @@ public class ListarPreguntasPanel extends JPanel {
         }
     }
 }
-

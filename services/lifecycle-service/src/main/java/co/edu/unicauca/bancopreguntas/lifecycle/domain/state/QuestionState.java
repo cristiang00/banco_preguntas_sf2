@@ -24,6 +24,11 @@ public interface QuestionState {
     void reject(PreguntaCicloVidaContext context, String motivo);
 
     /**
+     * Transición al crear una nueva versión mejorada (Rechazada -> Borrador) (HU6.S3).
+     */
+    void createNewVersion(PreguntaCicloVidaContext context);
+
+    /**
      * Valida si la pregunta puede ser modificada/editada en este estado.
      * Solo permitido en estado Borrador (SSCRUM-46).
      */
@@ -44,4 +49,3 @@ public interface QuestionState {
      */
     EstadoPreguntaDTO getEstadoDTO();
 }
-

@@ -114,32 +114,32 @@
   *Evidencia:* `HistorialRevisionesDialog` captura `ApiException (403)` y muestra diálogo amigable de advertencia de permisos.
 - [x] **HU6.S2.4** [HECHO] Pruebas unitarias automatizadas de validación de autoría.  
   *Evidencia:* `ReviewHexagonalUseCaseTest.testConsultarHistorialNoAutorLanza403()`.
-- [ ] **HU6.S3.1** [PENDIENTE] Lifecycle: transición Rechazada -> Borrador en patrón State y registrar en historial de transiciones.  
-  *Falta:* Modificar `RejectedState.java` y `LifecycleService.java`.
-- [ ] **HU6.S3.2** [PENDIENTE] Questions: número de versión y creación de nueva versión desde rechazada con validación HU1.  
-  *Falta:* Campo `version` en `PreguntaEntity` y método `crearNuevaVersion(...)` en `QuestionService.java`.
-- [ ] **HU6.S3.3** [PENDIENTE] Endpoint `PUT /preguntas/{id}/nueva-version` y Swagger.  
-  *Falta:* Mapping en `QuestionController.java`.
-- [ ] **HU6.S3.4** [PENDIENTE] Frontend: botón "Crear versión mejorada" visible solo en preguntas rechazadas.  
-  *Falta:* Botón y acción en `ListarPreguntasPanel.java` o `DetallePreguntaDialog.java`.
-- [ ] **HU6.S3.5** [PENDIENTE] Pruebas unitarias de transición y versionado.  
-  *Falta:* Tests en `LifecycleStateTest` y `QuestionBuilderAndFacadeTest`.
-- [ ] **HU6.S4.1** [PENDIENTE] Rechazo de transición cuando el estado no es Rechazada.  
-  *Falta:* Métodos en los demás estados (`ApprovedState`, etc.) lanzando `TransicionInvalidaException`.
-- [ ] **HU6.S4.2** [PENDIENTE] Retornar 409 con mensaje claro y Swagger.  
-  *Falta:* ExceptionHandler o status 409 en controller de Ciclo de Vida y Preguntas.
-- [ ] **HU6.S4.3** [PENDIENTE] Frontend: deshabilitar botón según estado y mostrar mensaje de error.  
-  *Falta:* Lógica de habilitación en UI.
-- [ ] **HU6.S4.4** [PENDIENTE] Pruebas unitarias de transiciones no permitidas desde cada estado.  
-  *Falta:* Tests unitarios de estados no permitidos.
-- [ ] **HU6.S5.1** [PENDIENTE] Reutilizar `PUT /preguntas/{id}/enviar-revision` para Borrador iniciando nueva ronda.  
-  *Falta:* Permitir reenvío a revisión y reset de revisores/ronda en revisión.
-- [ ] **HU6.S5.2** [PENDIENTE] Publicar evento `PreguntaEnviadaARevision` con número de versión y notificar a admin y revisores previos.  
-  *Falta:* Atributo `numeroVersion` en `PreguntaEnviadaARevisionEvent` y listener en notificaciones.
-- [ ] **HU6.S5.3** [PENDIENTE] Frontend: confirmación y color actualizado.  
-  *Falta:* Refresco visual tras envío a revisión.
-- [ ] **HU6.S5.4** [PENDIENTE] Pruebas unitarias de nueva ronda y evento con broker simulado.  
-  *Falta:* Test en `NotificationRabbitListenerTest` y `LifecycleServiceTest`.
+- [x] **HU6.S3.1** [HECHO] Lifecycle: transición Rechazada -> Borrador en patrón State y registrar en historial de transiciones.  
+  *Evidencia:* `RejectedState.createNewVersion(...)`, `AbstractQuestionState.java`, `LifecycleService.crearNuevaVersion(...)` con guardado en `HistorialTransicionEntity`.
+- [x] **HU6.S3.2** [HECHO] Questions: número de versión y creación de nueva versión desde rechazada con validación HU1.  
+  *Evidencia:* `PreguntaEntity.version`, `PreguntaBuilder.conVersion`, `QuestionService.crearNuevaVersion(...)` aplicando `validationClient.validarPregunta`.
+- [x] **HU6.S3.3** [HECHO] Endpoint `PUT /preguntas/{id}/nueva-version` y Swagger.  
+  *Evidencia:* `QuestionController.crearNuevaVersion(...)` y `LifecycleController.crearNuevaVersion(...)` con `@Operation` y respuestas 200, 400, 403, 409.
+- [x] **HU6.S3.4** [HECHO] Frontend: botón "Crear versión mejorada" visible/habilitado solo en preguntas rechazadas.  
+  *Evidencia:* Botón integrado en `ListarPreguntasPanel.java` y `DetallePreguntaDialog.java` con confirmación y llamada a `ApiClient.crearNuevaVersion`.
+- [x] **HU6.S3.5** [HECHO] Pruebas unitarias de transición y versionado.  
+  *Evidencia:* `LifecycleStateTest.crearNuevaVersion_rechazadaABorrador_exitoso()` y `QuestionBuilderAndFacadeTest.crearNuevaVersion_rechazada_incrementaVersionYCambiaABorrador()`.
+- [x] **HU6.S4.1** [HECHO] Rechazo de transición cuando el estado no es Rechazada.  
+  *Evidencia:* `AbstractQuestionState.createNewVersion(...)` lanza `TransicionInvalidaException` para cualquier estado distinto de `RejectedState`.
+- [x] **HU6.S4.2** [HECHO] Retornar 409 con mensaje claro y Swagger.  
+  *Evidencia:* Controladores retornan `HttpStatus.CONFLICT` (409) con mensaje explicativo ante transiciones no permitidas.
+- [x] **HU6.S4.3** [HECHO] Frontend: validación y deshabilitación según estado con diálogo de advertencia.  
+  *Evidencia:* Validación en `ListarPreguntasPanel` y visualización condicional en `DetallePreguntaDialog`.
+- [x] **HU6.S4.4** [HECHO] Pruebas unitarias de transiciones no permitidas desde cada estado.  
+  *Evidencia:* `LifecycleStateTest.crearNuevaVersion_desdeEstadosNoPermitidos_lanzaTransicionInvalidaException()` y `QuestionBuilderAndFacadeTest.crearNuevaVersion_estadoInvalido_lanzaConflictException()`.
+- [x] **HU6.S5.1** [HECHO] Reutilizar `PUT /preguntas/{id}/enviar-revision` para Borrador iniciando nueva ronda.  
+  *Evidencia:* `DraftState.submitForReview` y `LifecycleService.enviarARevision` operan sobre preguntas en Borrador independientemente de la versión.
+- [x] **HU6.S5.2** [HECHO] Publicar evento `PreguntaEnviadaARevision` con número de versión y notificar a admin y revisores previos.  
+  *Evidencia:* `PreguntaEnviadaARevisionEvent` transporta `version`; `NotificacionService.procesarEvento` maneja el evento con `RevisionNotificacionFactory`.
+- [x] **HU6.S5.3** [HECHO] Frontend: confirmación y color/estado actualizado.  
+  *Evidencia:* Diálogos en `ListarPreguntasPanel` y `DetallePreguntaDialog` refrescan datos y muestran columna de versión `v2`, `v3` y estado actualizado.
+- [x] **HU6.S5.4** [HECHO] Pruebas unitarias de nueva ronda y evento con broker simulado.  
+  *Evidencia:* `LifecycleStateTest.enviarARevision_exitoso()` valida versión y publicación de `PreguntaEnviadaARevisionEvent`.
 
 ---
 

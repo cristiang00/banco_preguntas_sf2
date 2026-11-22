@@ -95,7 +95,7 @@ public class ApiClient {
     }
 
     // =========================================================================
-    // Métodos de Preguntas (HU1, HU2, HU3)
+    // Métodos de Preguntas (HU1, HU2, HU3, HU6)
     // =========================================================================
 
     public PreguntaDTO crearPregunta(PreguntaDTO dto) throws IOException, ApiException {
@@ -168,6 +168,15 @@ public class ApiClient {
             }
 
             return nuevoEstado;
+        }
+        throw handleApiError(response);
+    }
+
+    public PreguntaDTO crearNuevaVersion(Long id, PreguntaDTO dto) throws IOException, ApiException {
+        String json = dto != null ? objectMapper.writeValueAsString(dto) : "{}";
+        HttpResponseData response = sendPut("/preguntas/" + id + "/nueva-version", json, true);
+        if (response.getStatusCode() == 200) {
+            return objectMapper.readValue(response.getBody(), PreguntaDTO.class);
         }
         throw handleApiError(response);
     }

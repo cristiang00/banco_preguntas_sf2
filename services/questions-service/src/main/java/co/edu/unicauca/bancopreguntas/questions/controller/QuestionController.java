@@ -131,6 +131,32 @@ public class QuestionController {
         }
     }
 
+    @PutMapping("/{id}/nueva-version")
+    @Operation(summary = "Crear nueva versión mejorada a partir de una pregunta rechazada (HU6.S3 / HU6.S4)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Nueva versión creada exitosamente en estado Borrador"),
+        @ApiResponse(responseCode = "400", description = "Error de validación estructural"),
+        @ApiResponse(responseCode = "403", description = "No tiene permisos para versionar esta pregunta"),
+        @ApiResponse(responseCode = "409", description = "La pregunta no está en estado Rechazada")
+    })
+    public ResponseEntity<?> crearNuevaVersion(
+            @PathVariable(value = "id") Long id,
+            @RequestBody(required = false) PreguntaDTO dto,
+            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId) {
+        try {
+            PreguntaDTO versionada = questionService.crearNuevaVersion(id, dto, userId);
+            return ResponseEntity.ok(versionada);
+        } catch (QuestionService.ConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (QuestionService.ValidationException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("valido", false, "errores", e.getErrores()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/pendientes")
     @Operation(summary = "Listar preguntas en estado Pendiente de revisión para asignación por el Administrador (HU4)")
     public ResponseEntity<List<PreguntaDTO>> listarPendientes() {
@@ -146,4 +172,3 @@ public class QuestionController {
         return ResponseEntity.ok(Map.of("preguntaId", id, "estado", estado));
     }
 }
-

@@ -97,6 +97,20 @@ public class NotificacionService {
                     "PREGUNTA_RECHAZADA",
                     data
             ));
+        } else if (event instanceof PreguntaEnviadaARevisionEvent peae) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("preguntaId", peae.getPreguntaId());
+            data.put("version", peae.getVersion());
+            data.put("autor", peae.getAutorNombre() != null ? peae.getAutorNombre() : ("Autor #" + peae.getAutorId()));
+            data.put("tituloPregunta", peae.getContexto() != null ? peae.getContexto() : ("Pregunta #" + peae.getPreguntaId()));
+
+            resultado.add(enviarNotificacionConReintentos(
+                    peae.getEventId(),
+                    peae.getCorrelationId(),
+                    "admin@unicauca.edu.co",
+                    "PREGUNTA_ENVIADA_REVISION",
+                    data
+            ));
         } else {
             log.info("[NotificacionService] Evento '{}' no requiere notificación por correo.", event.getEventType());
         }

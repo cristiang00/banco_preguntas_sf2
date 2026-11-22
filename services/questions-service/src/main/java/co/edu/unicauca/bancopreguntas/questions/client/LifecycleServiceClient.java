@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -83,5 +85,21 @@ public class LifecycleServiceClient {
             log.warn("Fallo temporal consultando si puede editar en Lifecycle: {}", e.getMessage());
         }
         return false;
+    }
+
+    public void crearNuevaVersion(Long preguntaId, Long userId) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-User-Id", String.valueOf(userId));
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            restTemplate.exchange(
+                    lifecycleServiceUrl + "/preguntas/" + preguntaId + "/nueva-version",
+                    HttpMethod.PUT,
+                    entity,
+                    Map.class
+            );
+        } catch (Exception e) {
+            log.warn("Fallo notificando transición de nueva versión a Lifecycle Service: {}", e.getMessage());
+        }
     }
 }

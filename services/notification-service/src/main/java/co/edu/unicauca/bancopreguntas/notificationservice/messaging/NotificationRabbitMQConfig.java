@@ -29,3 +29,4 @@ public class NotificationRabbitMQConfig {
         return BindingBuilder.bind(notificationsQueue).to(saberproExchange).with(RabbitMQConstants.ALL_EVENTS_ROUTING_KEY);
     }
 }
+

@@ -13,3 +13,4 @@ public final class RabbitMQConstants {
     public static final String ROUTING_KEY_PREFIX = "saberpro.";
     public static final String ALL_EVENTS_ROUTING_KEY = "saberpro.#";
 }
+

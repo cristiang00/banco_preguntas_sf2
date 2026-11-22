@@ -28,6 +28,7 @@ public class PreguntaBuilder {
     private String autorNombre;
     private EstadoPreguntaDTO estado = EstadoPreguntaDTO.BORRADOR;
     private LocalDateTime fechaCreacion;
+    private Integer version = 1;
 
     public PreguntaBuilder conId(Long id) {
         this.id = id;
@@ -120,6 +121,13 @@ public class PreguntaBuilder {
         return this;
     }
 
+    public PreguntaBuilder conVersion(Integer version) {
+        if (version != null) {
+            this.version = version;
+        }
+        return this;
+    }
+
     public PreguntaEntity build() {
         PreguntaEntity entity = new PreguntaEntity();
         entity.setId(this.id);
@@ -137,7 +145,7 @@ public class PreguntaBuilder {
         entity.setAutorNombre(this.autorNombre);
         entity.setEstadoProyeccion(this.estado != null ? this.estado : EstadoPreguntaDTO.BORRADOR);
         entity.setFechaCreacion(this.fechaCreacion != null ? this.fechaCreacion : LocalDateTime.now());
+        entity.setVersion(this.version != null ? this.version : 1);
         return entity;
     }
 }
-

@@ -29,3 +29,4 @@ public class AuditRabbitMQConfig {
         return BindingBuilder.bind(auditQueue).to(saberproExchange).with(RabbitMQConstants.ALL_EVENTS_ROUTING_KEY);
     }
 }
+
