@@ -8,6 +8,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Map;
+
 @Component
 public class QuestionsServiceClient {
 
@@ -33,5 +35,17 @@ public class QuestionsServiceClient {
             log.warn("[QuestionsServiceClient] No se pudo sincronizar proyección de estado en Questions Service para pregunta #{}: {}", id, e.getMessage());
         }
     }
-}
 
+    public Integer obtenerVersion(Long id) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resp = restTemplate.getForObject(questionsServiceUrl + "/preguntas/" + id, Map.class);
+            if (resp != null && resp.get("version") != null) {
+                return ((Number) resp.get("version")).intValue();
+            }
+        } catch (Exception e) {
+            log.warn("[QuestionsServiceClient] No se pudo obtener versión de Questions Service para pregunta #{}: {}", id, e.getMessage());
+        }
+        return 1;
+    }
+}

@@ -1,0 +1,127 @@
+{
+  "realm": "saberpro",
+  "enabled": true,
+  "displayName": "Banco de Preguntas Saber Pro",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "AUTOR",
+        "description": "Rol para autores de preguntas"
+      },
+      {
+        "name": "REVISOR",
+        "description": "Rol para evaluadores y revisores"
+      },
+      {
+        "name": "ADMINISTRADOR",
+        "description": "Rol de administración del sistema"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "gateway-client",
+      "name": "SaberPro API Gateway Client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "saberpro-client-secret-2026",
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "autor1",
+      "enabled": true,
+      "email": "autor1@unicauca.edu.co",
+      "firstName": "Autor",
+      "lastName": "Prueba",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "AUTOR"
+      ]
+    },
+    {
+      "username": "revisor1",
+      "enabled": true,
+      "email": "revisor1@unicauca.edu.co",
+      "firstName": "Revisor",
+      "lastName": "Uno",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "REVISOR"
+      ]
+    },
+    {
+      "username": "revisor2",
+      "enabled": true,
+      "email": "revisor2@unicauca.edu.co",
+      "firstName": "Revisor",
+      "lastName": "Dos",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "REVISOR"
+      ]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@unicauca.edu.co",
+      "firstName": "Admin",
+      "lastName": "General",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMINISTRADOR"
+      ]
+    }
+  ]
+}
+

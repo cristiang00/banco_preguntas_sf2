@@ -26,7 +26,7 @@ public class LifecycleController {
     }
 
     @PutMapping("/preguntas/{id}/enviar-revision")
-    @Operation(summary = "Enviar pregunta a revisión (HU2 - SSCRUM-42 a SSCRUM-45)")
+    @Operation(summary = "Enviar pregunta a revisión (HU2 - SSCRUM-42 a SSCRUM-45 / HU6.S5)")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Pregunta enviada a revisión exitosamente"),
         @ApiResponse(responseCode = "403", description = "El usuario no es el autor de la pregunta"),
@@ -34,8 +34,8 @@ public class LifecycleController {
     })
     public ResponseEntity<?> enviarARevision(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
-            @RequestHeader(value = "X-User-Name", defaultValue = "Autor") String userName,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Name", required = false, defaultValue = "") String userName,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
             @RequestBody(required = false) Map<String, Object> body) {
         try {
@@ -59,6 +59,35 @@ public class LifecycleController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/preguntas/{id}/nueva-version")
+    @Operation(summary = "Crear nueva versión mejorada de pregunta rechazada (HU6.S3 / HU6.S4)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Nueva versión creada exitosamente en estado Borrador"),
+        @ApiResponse(responseCode = "403", description = "El usuario no es el autor de la pregunta"),
+        @ApiResponse(responseCode = "409", description = "Transición inválida: la pregunta no está en estado Rechazada")
+    })
+    public ResponseEntity<?> crearNuevaVersion(
+            @PathVariable(value = "id") Long id,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        try {
+            EstadoPreguntaDTO nuevoEstado = lifecycleService.crearNuevaVersion(id, userId, correlationId);
+            return ResponseEntity.ok(Map.of(
+                    "preguntaId", id,
+                    "estado", nuevoEstado.name(),
+                    "estadoLabel", nuevoEstado.getLabel(),
+                    "estadoColor", nuevoEstado.getColorHex(),
+                    "mensaje", "Nueva versión creada exitosamente en estado Borrador"
+            ));
+        } catch (AccesoDenegadoException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (TransicionInvalidaException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -112,7 +141,7 @@ public class LifecycleController {
     @Operation(summary = "Aplicar decisión de revisores (Aprobada / Rechazada) coordinada desde Review Service")
     public ResponseEntity<?> aplicarDecision(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
             @RequestBody Map<String, Object> body) {
         try {

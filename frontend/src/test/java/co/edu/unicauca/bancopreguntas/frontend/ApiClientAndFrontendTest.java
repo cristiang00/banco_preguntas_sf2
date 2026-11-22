@@ -4,12 +4,17 @@ import co.edu.unicauca.bancopreguntas.contracts.dto.TokenResponseDTO;
 import co.edu.unicauca.bancopreguntas.frontend.client.ApiClient;
 import co.edu.unicauca.bancopreguntas.frontend.utils.EstadoCellRenderer;
 import co.edu.unicauca.bancopreguntas.frontend.views.*;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -36,6 +41,44 @@ class ApiClientAndFrontendTest {
         client.logout();
         assertFalse(client.isAuthenticated());
         assertNull(client.getCurrentUser());
+    }
+
+    @Test
+    @DisplayName("HU7.S2.4: Login exitoso mediante Keycloak simulado (Direct Access Grants)")
+    void testLoginWithKeycloakSimulado() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        int port = server.getAddress().getPort();
+
+        // Crear token JWT dummy con payload Keycloak (preferred_username: autor1, roles: [AUTOR])
+        String payloadJson = "{\"preferred_username\":\"autor1\",\"name\":\"Autor Prueba\",\"realm_access\":{\"roles\":[\"AUTOR\"]}}";
+        String encodedPayload = Base64.getUrlEncoder().withoutPadding().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
+        String dummyJwt = "eyJhbGciOiJSUzI1NiJ9." + encodedPayload + ".dummySignature123";
+
+        server.createContext("/realms/saberpro/protocol/openid-connect/token", exchange -> {
+            String resp = "{\"access_token\":\"" + dummyJwt + "\",\"expires_in\":3600,\"token_type\":\"Bearer\"}";
+            byte[] bytes = resp.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        try {
+            String kcUrl = "http://localhost:" + port + "/realms/saberpro/protocol/openid-connect/token";
+            ApiClient client = new ApiClient("http://localhost:8080/api/v1", kcUrl);
+
+            TokenResponseDTO token = client.login("autor1", "password123");
+
+            assertNotNull(token);
+            assertEquals("autor1", token.getNombreUsuario());
+            assertEquals("AUTOR", token.getRol());
+            assertEquals(2L, token.getUsuarioId());
+            assertTrue(client.isAuthenticated());
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
@@ -82,6 +125,13 @@ class ApiClientAndFrontendTest {
 
             NotificacionesPanel notif = new NotificacionesPanel();
             assertNotNull(notif);
+
+            try {
+                HistorialRevisionesDialog historial = new HistorialRevisionesDialog(null, 999L);
+                assertNotNull(historial);
+            } catch (HeadlessException ignored) {
+                // En entorno CI/headless, JDialog lanza HeadlessException al crear ventanas nativas
+            }
         });
     }
 }

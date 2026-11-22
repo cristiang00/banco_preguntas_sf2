@@ -1,0 +1,54 @@
+# ============================================================
+# CI Pipeline — Banco de Preguntas Saber Pro
+# HU10.S4.1: Flujo de GitHub Actions con Java 17 y mvn test
+# ============================================================
+name: CI
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/**" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (Java 17)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout del repositorio
+      - name: Checkout código fuente
+        uses: actions/checkout@v4
+
+      # 2. Configurar JDK 17 con caché de Maven
+      - name: Configurar Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # 3. Compilar y ejecutar TODOS los tests del monorepo
+      - name: Ejecutar mvn test (monorepo completo)
+        run: ./mvnw test --batch-mode --no-transfer-progress
+
+      # 4. Publicar resultados de pruebas como artefacto en caso de fallo
+      - name: Publicar reportes de pruebas
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: surefire-reports
+          path: '**/target/surefire-reports/*.xml'
+          retention-days: 7
+
+      # 5. Resumen en la interfaz de GitHub
+      - name: Resumen del build
+        if: always()
+        run: |
+          echo "## Resultado del CI — Banco de Preguntas Saber Pro" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Java:** 17 (Eclipse Temurin)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Módulos:** contracts, api-gateway, users-service, questions-service," >> $GITHUB_STEP_SUMMARY
+          echo "  validation-service, lifecycle-service, review-service," >> $GITHUB_STEP_SUMMARY
+          echo "  notification-service, audit-service, frontend, integration-tests" >> $GITHUB_STEP_SUMMARY
+

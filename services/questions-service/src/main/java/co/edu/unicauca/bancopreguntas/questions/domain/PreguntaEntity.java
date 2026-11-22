@@ -58,6 +58,9 @@ public class PreguntaEntity {
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion;
 
+    @Column(name = "version", nullable = false)
+    private Integer version = 1;
+
     public PreguntaEntity() {}
 
     public Long getId() { return id; }
@@ -104,5 +107,7 @@ public class PreguntaEntity {
 
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
-}
 
+    public Integer getVersion() { return version != null ? version : 1; }
+    public void setVersion(Integer version) { this.version = version; }
+}

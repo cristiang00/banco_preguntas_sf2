@@ -18,7 +18,11 @@
     <description>Microservicio de gestión de usuarios, roles, autenticación y seguridad</description>
 
     <dependencies>
-        <dependency>
+                <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+<dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

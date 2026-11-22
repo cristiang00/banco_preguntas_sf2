@@ -6,4 +6,4 @@ CREATE DATABASE lifecycle_db;
 CREATE DATABASE review_db;
 CREATE DATABASE notification_db;
 CREATE DATABASE audit_db;
-
+CREATE DATABASE keycloak_db;

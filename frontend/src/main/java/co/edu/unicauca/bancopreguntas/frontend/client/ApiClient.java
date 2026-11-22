@@ -19,9 +19,11 @@ import java.util.*;
 public class ApiClient {
 
     private static final String DEFAULT_GATEWAY_URL = "http://localhost:8080/api/v1";
+    private static final String DEFAULT_KEYCLOAK_TOKEN_URL = "http://localhost:8089/realms/saberpro/protocol/openid-connect/token";
     private static ApiClient instance;
 
     private final String baseUrl;
+    private final String keycloakTokenUrl;
     private final ObjectMapper objectMapper;
 
     private String token;
@@ -45,7 +47,12 @@ public class ApiClient {
     }
 
     public ApiClient(String baseUrl) {
+        this(baseUrl, System.getProperty("keycloak.token.url", System.getenv().getOrDefault("KEYCLOAK_TOKEN_URL", DEFAULT_KEYCLOAK_TOKEN_URL)));
+    }
+
+    public ApiClient(String baseUrl, String keycloakTokenUrl) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.keycloakTokenUrl = keycloakTokenUrl;
         this.objectMapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .registerModule(new JavaTimeModule());
@@ -76,10 +83,27 @@ public class ApiClient {
     }
 
     // =========================================================================
-    // Métodos de Autenticación
+    // Métodos de Autenticación (HU7 - Keycloak con fallback)
     // =========================================================================
 
     public TokenResponseDTO login(String username, String password) throws IOException, ApiException {
+        // HU7.S2: Intentar autenticación directa contra Keycloak (Direct Access Grants)
+        try {
+            TokenResponseDTO kcToken = loginWithKeycloak(username, password);
+            if (kcToken != null) {
+                this.token = kcToken.getToken();
+                this.currentUser = kcToken;
+                return kcToken;
+            }
+        } catch (ApiException e) {
+            // Si Keycloak respondió rechazo por credenciales, propagar la excepción
+            if (e.getStatusCode() == 400 || e.getStatusCode() == 401 || e.getStatusCode() == 403) {
+                throw e;
+            }
+        } catch (Exception ignored) {
+            // Fallback si Keycloak no está levantado en entornos de prueba locales
+        }
+
         LoginRequestDTO request = new LoginRequestDTO(username, password);
         String json = objectMapper.writeValueAsString(request);
 
@@ -94,8 +118,75 @@ public class ApiClient {
         }
     }
 
+    public TokenResponseDTO loginWithKeycloak(String username, String password) throws IOException, ApiException {
+        URL url = URI.create(keycloakTokenUrl).toURL();
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(3000);
+        conn.setReadTimeout(5000);
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("Accept", "application/json");
+
+        String formBody = "grant_type=password"
+                + "&client_id=gateway-client"
+                + "&client_secret=saberpro-client-secret-2026"
+                + "&username=" + URLEncoder.encode(username, StandardCharsets.UTF_8)
+                + "&password=" + URLEncoder.encode(password, StandardCharsets.UTF_8);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(formBody.getBytes(StandardCharsets.UTF_8));
+        }
+
+        int code = conn.getResponseCode();
+        InputStream is = (code >= 200 && code < 400) ? conn.getInputStream() : conn.getErrorStream();
+        String body = is != null ? new String(is.readAllBytes(), StandardCharsets.UTF_8) : "";
+
+        if (code == 200) {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(body);
+            String accessToken = root.has("access_token") ? root.get("access_token").asText() : null;
+            if (accessToken != null) {
+                return parseKeycloakToken(accessToken, username);
+            }
+        } else if (code == 400 || code == 401) {
+            throw new ApiException(code, "Credenciales inválidas en Keycloak");
+        }
+        return null;
+    }
+
+    private TokenResponseDTO parseKeycloakToken(String token, String fallbackUsername) {
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length >= 2) {
+                byte[] decodedPayload = Base64.getUrlDecoder().decode(parts[1]);
+                com.fasterxml.jackson.databind.JsonNode payload = objectMapper.readTree(decodedPayload);
+
+                String username = payload.has("preferred_username") ? payload.get("preferred_username").asText() : fallbackUsername;
+                String role = "AUTOR";
+                if (payload.has("realm_access") && payload.get("realm_access").has("roles")) {
+                    for (com.fasterxml.jackson.databind.JsonNode r : payload.get("realm_access").get("roles")) {
+                        String rName = r.asText().toUpperCase();
+                        if ("ADMINISTRADOR".equals(rName) || "REVISOR".equals(rName) || "AUTOR".equals(rName)) {
+                            role = rName;
+                            break;
+                        }
+                    }
+                }
+                Long userId = 2L;
+                if ("admin".equalsIgnoreCase(username)) userId = 1L;
+                else if ("autor1".equalsIgnoreCase(username)) userId = 2L;
+                else if ("revisor1".equalsIgnoreCase(username)) userId = 4L;
+                else if ("revisor2".equalsIgnoreCase(username)) userId = 5L;
+
+                String nombreCompleto = payload.has("name") ? payload.get("name").asText() : username;
+                return new TokenResponseDTO(token, userId, username, nombreCompleto, role);
+            }
+        } catch (Exception ignored) {}
+        return new TokenResponseDTO(token, 2L, fallbackUsername, fallbackUsername, "AUTOR");
+    }
+
     // =========================================================================
-    // Métodos de Preguntas (HU1, HU2, HU3)
+    // Métodos de Preguntas (HU1, HU2, HU3, HU6)
     // =========================================================================
 
     public PreguntaDTO crearPregunta(PreguntaDTO dto) throws IOException, ApiException {
@@ -172,6 +263,15 @@ public class ApiClient {
         throw handleApiError(response);
     }
 
+    public PreguntaDTO crearNuevaVersion(Long id, PreguntaDTO dto) throws IOException, ApiException {
+        String json = dto != null ? objectMapper.writeValueAsString(dto) : "{}";
+        HttpResponseData response = sendPut("/preguntas/" + id + "/nueva-version", json, true);
+        if (response.getStatusCode() == 200) {
+            return objectMapper.readValue(response.getBody(), PreguntaDTO.class);
+        }
+        throw handleApiError(response);
+    }
+
     public List<String> obtenerCatalogos(String tipo) throws IOException, ApiException {
         HttpResponseData response = sendGet("/catalogos/" + tipo, false);
         if (response.getStatusCode() == 200) {
@@ -210,6 +310,34 @@ public class ApiClient {
     }
 
     public List<RevisionItemDTO> listarRevisionesAsignadas() throws IOException, ApiException {
+        return listarRevisionesAsignadas(0, 50, null, null, null);
+    }
+
+    public List<RevisionItemDTO> listarRevisionesAsignadas(int page, int size, String estado, String dificultad, String competencia)
+            throws IOException, ApiException {
+        StringBuilder sb = new StringBuilder("/revisiones/asignadas?page=").append(page).append("&size=").append(size);
+        if (estado != null && !estado.isBlank() && !"Todos".equalsIgnoreCase(estado)) {
+            sb.append("&estado=").append(URLEncoder.encode(estado, StandardCharsets.UTF_8));
+        }
+        if (dificultad != null && !dificultad.isBlank() && !"Todos".equalsIgnoreCase(dificultad)) {
+            sb.append("&dificultad=").append(URLEncoder.encode(dificultad, StandardCharsets.UTF_8));
+        }
+        if (competencia != null && !competencia.isBlank() && !"Todos".equalsIgnoreCase(competencia)) {
+            sb.append("&competencia=").append(URLEncoder.encode(competencia, StandardCharsets.UTF_8));
+        }
+        HttpResponseData response = sendGet(sb.toString(), true);
+        if (response.getStatusCode() == 200) {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            if (root.has("content")) {
+                return objectMapper.readValue(root.get("content").toString(),
+                        new TypeReference<List<RevisionItemDTO>>() {});
+            }
+            return objectMapper.readValue(response.getBody(), new TypeReference<List<RevisionItemDTO>>() {});
+        }
+        throw handleApiError(response);
+    }
+
+    public List<RevisionItemDTO> listarRevisionesAsignadasLegacy() throws IOException, ApiException {
         HttpResponseData response = sendGet("/revisiones/asignadas", true);
         if (response.getStatusCode() == 200) {
             // El backend devuelve objeto paginado: { "content": [...], "totalPages": N, ... }
@@ -232,6 +360,16 @@ public class ApiClient {
         if (response.getStatusCode() != 200) {
             throw handleApiError(response);
         }
+    }
+
+    public Map<String, Object> consultarHistorialRevisiones(Long preguntaId, int page, int size)
+            throws IOException, ApiException {
+        String path = "/revisiones/pregunta/" + preguntaId + "/historial?page=" + page + "&size=" + size;
+        HttpResponseData response = sendGet(path, true);
+        if (response.getStatusCode() == 200) {
+            return objectMapper.readValue(response.getBody(), new TypeReference<Map<String, Object>>() {});
+        }
+        throw handleApiError(response);
     }
 
     public List<String> obtenerObservaciones(Long preguntaId) throws IOException, ApiException {

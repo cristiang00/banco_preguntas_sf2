@@ -5,6 +5,8 @@ import co.edu.unicauca.bancopreguntas.gateway.filter.CorrelationFilter;
 import co.edu.unicauca.bancopreguntas.gateway.security.JwtValidator;
 import io.jsonwebtoken.Claims;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -24,7 +26,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "API Gateway", description = "Enrutamiento centralizado, verificación de tokens, roles, correlación y timeouts")
+@Tag(name = "API Gateway", description = "Enrutamiento centralizado, verificación de tokens Keycloak/JWT, roles, correlación y timeouts (HU7)")
 public class GatewayRoutingController {
 
     private static final Logger log = LoggerFactory.getLogger(GatewayRoutingController.class);
@@ -69,7 +71,14 @@ public class GatewayRoutingController {
     }
 
     @RequestMapping(value = "/**")
-    @Operation(summary = "Proxy inverso centralizado", description = "Enruta solicitudes a los microservicios con validación JWT, propagación de identidad y correlación")
+    @Operation(summary = "Proxy inverso centralizado", description = "Enruta solicitudes a los microservicios con validación JWT contra Keycloak, propagación de identidad y correlación")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Petición procesada exitosamente por el microservicio"),
+        @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado por rol no autorizado en la matriz de permisos"),
+        @ApiResponse(responseCode = "404", description = "Ruta de servicio no encontrada"),
+        @ApiResponse(responseCode = "503", description = "Servicio destino no disponible")
+    })
     public ResponseEntity<?> routeRequest(
             HttpMethod method,
             HttpServletRequest request,
@@ -112,39 +121,39 @@ public class GatewayRoutingController {
                         .body(Map.of("error", "Token JWT expirado o inválido: " + e.getMessage()));
             }
 
-            // 3. Control inicial de roles en el Gateway
+            // 3. Control inicial de roles en el Gateway (HU7.S4)
             ResponseEntity<?> roleCheck = checkRoleAuthorization(subPath, method, claims);
             if (roleCheck != null) {
                 return roleCheck;
             }
         }
 
-        // 4. Preparar cabeceras para el microservicio de destino
+        // 4. Preparar cabeceras para el microservicio de destino (HU7.S5.2: ignorar cabeceras x-user- no verificadas)
         HttpHeaders headers = new HttpHeaders();
         Enumeration<String> headerNames = request.getHeaderNames();
         if (headerNames != null) {
             while (headerNames.hasMoreElements()) {
                 String name = headerNames.nextElement();
                 String lowerName = name.toLowerCase();
-                // Filtrar cabeceras Hop-by-Hop y cabeceras de identidad no autenticadas
+                // Filtrar cabeceras Hop-by-Hop y cabeceras de identidad inyectadas por el cliente
                 if (!HOP_BY_HOP_HEADERS.contains(lowerName) && !lowerName.startsWith("x-user-")) {
                     headers.addAll(name, Collections.list(request.getHeaders(name)));
                 }
             }
         }
 
-        // Inyectar o propagar cabeceras de contexto seguras
+        // Inyectar o propagar cabeceras de contexto seguras extraídas de claims verificados
         headers.set(CorrelationFilter.CORRELATION_HEADER, correlationId);
         if (claims != null) {
-            Object userId = claims.get("userId");
-            Object role = claims.get("role");
-            String username = claims.getSubject();
+            Long userId = jwtValidator.extractUserId(claims);
+            String role = jwtValidator.extractRole(claims);
+            String username = jwtValidator.extractUsername(claims);
             if (userId != null) headers.set("X-User-Id", String.valueOf(userId));
-            if (role != null) headers.set("X-User-Role", String.valueOf(role));
+            if (role != null) headers.set("X-User-Role", role);
             if (username != null) headers.set("X-User-Name", username);
         }
 
-        // 5. Construir URI de destino segura tolerante a acentos y caracteres especiales
+        // 5. Construir URI de destino segura
         URI targetUri;
         try {
             UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(targetServiceBaseUrl).path(subPath);
@@ -246,10 +255,10 @@ public class GatewayRoutingController {
     }
 
     private ResponseEntity<?> checkRoleAuthorization(String subPath, HttpMethod method, Claims claims) {
-        String role = (String) claims.get("role");
+        String role = jwtValidator.extractRole(claims);
         if (role == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Rol de usuario no identificado"));
+                    .body(Map.of("error", "Rol de usuario no identificado o sin permisos asignados"));
         }
 
         // HU4: Asignación de revisores y consulta de preguntas pendientes de asignación -> Solo ADMINISTRADOR
@@ -277,6 +286,14 @@ public class GatewayRoutingController {
             if (!"REVISOR".equalsIgnoreCase(role)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("error", "Acceso denegado: solo REVISOR puede emitir evaluaciones o decisiones"));
+            }
+        }
+
+        // HU6: Historial de revisiones -> Solo AUTOR o ADMINISTRADOR
+        if (subPath.startsWith("/revisiones/pregunta/") && subPath.contains("/historial")) {
+            if (!"AUTOR".equalsIgnoreCase(role) && !"ADMINISTRADOR".equalsIgnoreCase(role)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Acceso denegado: solo el AUTOR de la pregunta o ADMINISTRADOR pueden consultar el historial"));
             }
         }
 

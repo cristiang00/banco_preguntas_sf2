@@ -18,7 +18,11 @@
     <description>Microservicio de asignación de revisores, evaluaciones y decisiones</description>
 
     <dependencies>
-        <dependency>
+                <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+<dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
@@ -43,7 +47,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>

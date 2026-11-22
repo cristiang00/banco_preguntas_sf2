@@ -9,6 +9,14 @@ public class ApiException extends Exception {
     private final String responseBody;
     private final List<ErrorValidacionDTO> erroresValidacion;
 
+    public ApiException(int statusCode, String message) {
+        this(statusCode, message, "", List.of());
+    }
+
+    public ApiException(int statusCode, String message, String responseBody) {
+        this(statusCode, message, responseBody, List.of());
+    }
+
     public ApiException(int statusCode, String message, String responseBody, List<ErrorValidacionDTO> erroresValidacion) {
         super(message);
         this.statusCode = statusCode;
@@ -28,4 +36,3 @@ public class ApiException extends Exception {
         return erroresValidacion;
     }
 }
-

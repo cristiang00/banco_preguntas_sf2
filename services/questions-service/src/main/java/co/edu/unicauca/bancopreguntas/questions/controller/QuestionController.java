@@ -35,8 +35,8 @@ public class QuestionController {
     })
     public ResponseEntity<?> crearPregunta(
             @RequestBody PreguntaDTO dto,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
-            @RequestHeader(value = "X-User-Name", defaultValue = "Autor") String userName) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Name", required = false, defaultValue = "") String userName) {
         try {
             PreguntaDTO creada = questionService.crearPregunta(dto, userId, userName);
             return ResponseEntity.status(HttpStatus.CREATED).body(creada);
@@ -60,8 +60,8 @@ public class QuestionController {
             @RequestParam(value = "dificultad", required = false, defaultValue = "TODOS") String dificultad,
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "10") int size,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "AUTOR") String userRole) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole) {
 
         boolean esAdmin = "ADMINISTRADOR".equalsIgnoreCase(userRole);
         Long autorId = esAdmin ? null : userId;
@@ -93,8 +93,8 @@ public class QuestionController {
     })
     public ResponseEntity<?> consultarDetalle(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "AUTOR") String userRole) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole) {
         try {
             boolean esAdmin = "ADMINISTRADOR".equalsIgnoreCase(userRole);
             return queryFacade.consultarDetalle(id, userId, esAdmin)
@@ -116,7 +116,7 @@ public class QuestionController {
     public ResponseEntity<?> editarBorrador(
             @PathVariable(value = "id") Long id,
             @RequestBody PreguntaDTO dto,
-            @RequestHeader(value = "X-User-Id", defaultValue = "3") Long userId) {
+            @RequestHeader(value = "X-User-Id", required = true) Long userId) {
         try {
             PreguntaDTO actualizada = questionService.editarBorrador(id, dto, userId);
             return ResponseEntity.ok(actualizada);
@@ -128,6 +128,32 @@ public class QuestionController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/nueva-version")
+    @Operation(summary = "Crear nueva versión mejorada a partir de una pregunta rechazada (HU6.S3 / HU6.S4)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Nueva versión creada exitosamente en estado Borrador"),
+        @ApiResponse(responseCode = "400", description = "Error de validación estructural"),
+        @ApiResponse(responseCode = "403", description = "No tiene permisos para versionar esta pregunta"),
+        @ApiResponse(responseCode = "409", description = "La pregunta no está en estado Rechazada")
+    })
+    public ResponseEntity<?> crearNuevaVersion(
+            @PathVariable(value = "id") Long id,
+            @RequestBody(required = false) PreguntaDTO dto,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId) {
+        try {
+            PreguntaDTO versionada = questionService.crearNuevaVersion(id, dto, userId);
+            return ResponseEntity.ok(versionada);
+        } catch (QuestionService.ConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (QuestionService.ValidationException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("valido", false, "errores", e.getErrores()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -146,4 +172,3 @@ public class QuestionController {
         return ResponseEntity.ok(Map.of("preguntaId", id, "estado", estado));
     }
 }
-

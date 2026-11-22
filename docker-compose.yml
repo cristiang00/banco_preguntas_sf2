@@ -1,6 +1,6 @@
 services:
   # =========================================================================
-  # Infraestructura de Persistencia y Mensajería
+  # Infraestructura de Persistencia, Mensajería y Seguridad
   # =========================================================================
   postgres:
     image: postgres:16-alpine
@@ -38,31 +38,76 @@ services:
     networks:
       - saberpro-network
 
-  # =========================================================================
-  # Microservicios del Bounded Context
-  # =========================================================================
-  users-service:
-    build:
-      context: ./services/users-service
-      dockerfile: Dockerfile
-    container_name: saberpro-users-service
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/users_db
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
-      JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: saberpro-mailpit
     ports:
-      - "8081:8081"
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - saberpro-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    container_name: saberpro-keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_db
+      KC_DB_USERNAME: ${POSTGRES_USER:-postgres}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8089:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./docker/keycloak:/opt/keycloak/data/import
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - saberpro-network
 
+  # =========================================================================
+  # Microservicios del Bounded Context (Puertos internos no expuestos fuera del compose)
+  # =========================================================================
+  users-service:
+    build:
+      context: .
+      dockerfile: services/users-service/Dockerfile
+    container_name: saberpro-users-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/users_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || wget -q --spider http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saberpro-network
+
   questions-service:
     build:
-      context: ./services/questions-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/questions-service/Dockerfile
     container_name: saberpro-questions-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/questions_db
@@ -70,26 +115,40 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
       SERVICES_VALIDATION_URL: http://validation-service:8083
       SERVICES_LIFECYCLE_URL: http://lifecycle-service:8084
-    ports:
-      - "8082:8082"
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/actuator/health || wget -q --spider http://localhost:8082/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - saberpro-network
 
   validation-service:
     build:
-      context: ./services/validation-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/validation-service/Dockerfile
     container_name: saberpro-validation-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/validation_db
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
       SERVICES_QUESTIONS_URL: http://questions-service:8082
-    ports:
-      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/actuator/health || wget -q --spider http://localhost:8083/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,25 +157,37 @@ services:
 
   lifecycle-service:
     build:
-      context: ./services/lifecycle-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/lifecycle-service/Dockerfile
     container_name: saberpro-lifecycle-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/lifecycle_db
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
-    ports:
-      - "8084:8084"
+      SERVICES_NOTIFICATION_URL: http://notification-service:8086
+      SERVICES_AUDIT_URL: http://audit-service:8087
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8084/actuator/health || wget -q --spider http://localhost:8084/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - saberpro-network
 
   review-service:
     build:
-      context: ./services/review-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/review-service/Dockerfile
     container_name: saberpro-review-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/review_db
@@ -125,83 +196,137 @@ services:
       SERVICES_USERS_URL: http://users-service:8081
       SERVICES_QUESTIONS_URL: http://questions-service:8082
       SERVICES_LIFECYCLE_URL: http://lifecycle-service:8084
-    ports:
-      - "8085:8085"
+      SERVICES_NOTIFICATION_URL: http://notification-service:8086
+      SERVICES_AUDIT_URL: http://audit-service:8087
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8085/actuator/health || wget -q --spider http://localhost:8085/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - saberpro-network
 
   notification-service:
     build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/notification-service/Dockerfile
     container_name: saberpro-notification-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
-      NOTIFICATION_EMAIL_PROVIDER: ${NOTIFICATION_EMAIL_PROVIDER:-mock}
-    ports:
-      - "8086:8086"
+      NOTIFICATION_EMAIL_PROVIDER: ${NOTIFICATION_EMAIL_PROVIDER:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-notificaciones@unicauca.edu.co}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8086/actuator/health || wget -q --spider http://localhost:8086/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - saberpro-network
 
   audit-service:
     build:
-      context: ./services/audit-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/audit-service/Dockerfile
     container_name: saberpro-audit-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/audit_db
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
-    ports:
-      - "8087:8087"
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8087/actuator/health || wget -q --spider http://localhost:8087/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - saberpro-network
 
   # =========================================================================
-  # API Gateway Centralizado
+  # API Gateway Centralizado (Único punto de entrada HTTP público)
   # =========================================================================
   api-gateway:
     build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: saberpro-api-gateway
     environment:
       JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
-      USERS_SERVICE_URL: ${USERS_SERVICE_URL:-http://users-service:8081}
-      QUESTIONS_SERVICE_URL: ${QUESTIONS_SERVICE_URL:-http://questions-service:8082}
-      VALIDATION_SERVICE_URL: ${VALIDATION_SERVICE_URL:-http://validation-service:8083}
-      LIFECYCLE_SERVICE_URL: ${LIFECYCLE_SERVICE_URL:-http://lifecycle-service:8084}
-      REVIEW_SERVICE_URL: ${REVIEW_SERVICE_URL:-http://review-service:8085}
-      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8086}
-      AUDIT_SERVICE_URL: ${AUDIT_SERVICE_URL:-http://audit-service:8087}
-      GATEWAY_SERVICES_USERS: ${USERS_SERVICE_URL:-http://users-service:8081}
-      GATEWAY_SERVICES_QUESTIONS: ${QUESTIONS_SERVICE_URL:-http://questions-service:8082}
-      GATEWAY_SERVICES_VALIDATION: ${VALIDATION_SERVICE_URL:-http://validation-service:8083}
-      GATEWAY_SERVICES_LIFECYCLE: ${LIFECYCLE_SERVICE_URL:-http://lifecycle-service:8084}
-      GATEWAY_SERVICES_REVIEW: ${REVIEW_SERVICE_URL:-http://review-service:8085}
-      GATEWAY_SERVICES_NOTIFICATION: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8086}
-      GATEWAY_SERVICES_AUDIT: ${AUDIT_SERVICE_URL:-http://audit-service:8087}
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8089/realms/saberpro}
+      USERS_SERVICE_URL: http://users-service:8081
+      QUESTIONS_SERVICE_URL: http://questions-service:8082
+      VALIDATION_SERVICE_URL: http://validation-service:8083
+      LIFECYCLE_SERVICE_URL: http://lifecycle-service:8084
+      REVIEW_SERVICE_URL: http://review-service:8085
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      AUDIT_SERVICE_URL: http://audit-service:8087
+      GATEWAY_SERVICES_USERS: http://users-service:8081
+      GATEWAY_SERVICES_QUESTIONS: http://questions-service:8082
+      GATEWAY_SERVICES_VALIDATION: http://validation-service:8083
+      GATEWAY_SERVICES_LIFECYCLE: http://lifecycle-service:8084
+      GATEWAY_SERVICES_REVIEW: http://review-service:8085
+      GATEWAY_SERVICES_NOTIFICATION: http://notification-service:8086
+      GATEWAY_SERVICES_AUDIT: http://audit-service:8087
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || wget -q --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
-      - users-service
-      - questions-service
-      - validation-service
-      - lifecycle-service
-      - review-service
-      - notification-service
-      - audit-service
+      users-service:
+        condition: service_healthy
+      questions-service:
+        condition: service_healthy
+      validation-service:
+        condition: service_healthy
+      lifecycle-service:
+        condition: service_healthy
+      review-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      audit-service:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
     networks:
       - saberpro-network
 
@@ -211,4 +336,4 @@ networks:
 
 volumes:
   postgres-data:
-
+  keycloak-data:

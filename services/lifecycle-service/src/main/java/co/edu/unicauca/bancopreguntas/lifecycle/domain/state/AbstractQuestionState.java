@@ -26,6 +26,12 @@ public abstract class AbstractQuestionState implements QuestionState {
     }
 
     @Override
+    public void createNewVersion(PreguntaCicloVidaContext context) {
+        throw new TransicionInvalidaException(
+                "No se puede crear una nueva versión desde el estado '" + getName() + "'. Solo está permitido desde estado 'Rechazada'");
+    }
+
+    @Override
     public void ensureEditable() {
         throw new TransicionInvalidaException(
                 "Solo se pueden editar preguntas en estado Borrador. El estado actual es '" + getName() + "'");
@@ -36,4 +42,3 @@ public abstract class AbstractQuestionState implements QuestionState {
         return false;
     }
 }
-

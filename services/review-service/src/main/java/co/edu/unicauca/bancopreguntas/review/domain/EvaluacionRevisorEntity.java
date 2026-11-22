@@ -37,10 +37,10 @@ public class EvaluacionRevisorEntity {
     }
 
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public Long getRevisionId() { return revisionId; }
     public String getCriterio() { return criterio; }
     public Double getCalificacion() { return calificacion; }
     public String getComentario() { return comentario; }
     public LocalDateTime getFechaEvaluacion() { return fechaEvaluacion; }
 }
-

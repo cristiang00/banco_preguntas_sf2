@@ -4,6 +4,7 @@ import co.edu.unicauca.bancopreguntas.contracts.dto.AsignarRevisoresRequestDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.DecisionRequestDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.EvaluacionRequestDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.PreguntaDTO;
+import co.edu.unicauca.bancopreguntas.review.application.usecases.ConsultarHistorialUseCase;
 import co.edu.unicauca.bancopreguntas.review.client.QuestionsServiceClient;
 import co.edu.unicauca.bancopreguntas.review.domain.EvaluacionRevisorEntity;
 import co.edu.unicauca.bancopreguntas.review.domain.ObservacionEntity;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,15 +25,19 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/revisiones")
-@Tag(name = "Revisiones", description = "Asignación de revisores, listado asignado, evaluaciones y decisiones con consenso")
+@Tag(name = "Revisiones", description = "Endpoints para el flujo de revisión por pares, asignación, evaluación e historial")
 public class ReviewController {
 
     private final ReviewService reviewService;
     private final QuestionsServiceClient questionsClient;
+    private final ConsultarHistorialUseCase consultarHistorialUseCase;
 
-    public ReviewController(ReviewService reviewService, QuestionsServiceClient questionsClient) {
+    public ReviewController(ReviewService reviewService,
+                            QuestionsServiceClient questionsClient,
+                            @Autowired(required = false) ConsultarHistorialUseCase consultarHistorialUseCase) {
         this.reviewService = reviewService;
         this.questionsClient = questionsClient;
+        this.consultarHistorialUseCase = consultarHistorialUseCase;
     }
 
     @PostMapping("/asignar")
@@ -44,8 +50,8 @@ public class ReviewController {
     })
     public ResponseEntity<?> asignarRevisores(
             @RequestBody AsignarRevisoresRequestDTO request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "ADMINISTRADOR") String userRole,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
         if (!"ADMINISTRADOR".equalsIgnoreCase(userRole)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los administradores pueden asignar revisores"));
@@ -77,18 +83,24 @@ public class ReviewController {
     }
 
     @GetMapping("/asignadas")
-    @Operation(summary = "Listar preguntas asignadas al revisor autenticado con paginación y filtros (HU5 - SSCRUM-62)")
+    @Operation(summary = "Listar preguntas asignadas al revisor autenticado con paginación y filtros (HU5 / HU12)",
+               description = "Permite filtrar por estado de revisión, dificultad y competencia antes de paginar para totales exactos")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Listado paginado de revisiones"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado: rol Revisor requerido")
+    })
     public ResponseEntity<?> listarAsignadas(
-            @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId,
-            @RequestHeader(value = "X-User-Role", defaultValue = "REVISOR") String userRole,
+            @RequestHeader(value = "X-User-Id", required = true) Long revisorId,
+            @RequestHeader(value = "X-User-Role", required = false, defaultValue = "AUTOR") String userRole,
             @RequestParam(value = "page", required = false, defaultValue = "0") int page,
             @RequestParam(value = "size", required = false, defaultValue = "10") int size,
+            @RequestParam(value = "estado", required = false) String estado,
             @RequestParam(value = "dificultad", required = false) String dificultad,
             @RequestParam(value = "competencia", required = false) String competencia) {
         if (!"REVISOR".equalsIgnoreCase(userRole)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Acceso exclusivo para usuarios con rol Revisor"));
         }
-        return ResponseEntity.ok(reviewService.listarAsignadas(revisorId, page, size, dificultad, competencia));
+        return ResponseEntity.ok(reviewService.listarAsignadas(revisorId, page, size, estado, dificultad, competencia));
     }
 
     @PostMapping("/{id}/evaluacion")
@@ -101,7 +113,7 @@ public class ReviewController {
     public ResponseEntity<?> registrarEvaluacion(
             @PathVariable(value = "id") Long id,
             @RequestBody EvaluacionRequestDTO request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId) {
+            @RequestHeader(value = "X-User-Id", required = true) Long revisorId) {
         try {
             EvaluacionRevisorEntity eval = reviewService.registrarEvaluacion(id, request, revisorId);
             return ResponseEntity.ok(eval);
@@ -125,14 +137,13 @@ public class ReviewController {
     public ResponseEntity<?> registrarDecision(
             @PathVariable(value = "id") Long id,
             @RequestBody DecisionRequestDTO request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "6") Long revisorId,
+            @RequestHeader(value = "X-User-Id", required = true) Long revisorId,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
         try {
             RevisionEntity rev = reviewService.registrarDecision(id, request, revisorId, correlationId);
             return ResponseEntity.ok(Map.of(
-                    "revisionId", rev.getId(),
-                    "estadoRevision", rev.getEstado().name(),
-                    "mensaje", "Decisión registrada correctamente"
+                    "mensaje", "Decisión registrada exitosamente",
+                    "estadoRevision", rev.getEstado().name()
             ));
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
@@ -143,9 +154,36 @@ public class ReviewController {
         }
     }
 
-    @GetMapping("/pregunta/{preguntaId}/observaciones")
-    @Operation(summary = "Consultar observaciones de revisores visibles para el autor")
-    public ResponseEntity<List<ObservacionEntity>> listarObservaciones(@PathVariable(value = "preguntaId") Long preguntaId) {
-        return ResponseEntity.ok(reviewService.listarObservaciones(preguntaId));
+    @GetMapping("/pregunta/{id}/observaciones")
+    @Operation(summary = "Consultar observaciones visibles para el Autor de una pregunta rechazada")
+    public ResponseEntity<List<ObservacionEntity>> listarObservaciones(@PathVariable(value = "id") Long id) {
+        return ResponseEntity.ok(reviewService.listarObservaciones(id));
+    }
+
+    @GetMapping("/pregunta/{id}/historial")
+    @Operation(summary = "Consultar historial de revisiones y observaciones por pregunta (HU6 - Subtareas 1 y 2)",
+               description = "Agrupa revisiones por ronda con revisor, decisión, fecha y observaciones. Solo el autor puede consultar.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Historial obtenido exitosamente"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado: solo el autor de la pregunta puede consultar su historial"),
+        @ApiResponse(responseCode = "404", description = "Pregunta no encontrada")
+    })
+    public ResponseEntity<?> consultarHistorial(
+            @PathVariable(value = "id") Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        if (consultarHistorialUseCase == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Caso de uso de historial no disponible"));
+        }
+        try {
+            Map<String, Object> historial = consultarHistorialUseCase.execute(id, userId, page, size);
+            return ResponseEntity.ok(historial);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
     }
 }
