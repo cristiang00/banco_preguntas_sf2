@@ -17,7 +17,11 @@
     <description>Puerta de enlace centralizada, enrutamiento, validación JWT, correlación y CORS</description>
 
     <dependencies>
-        <dependency>
+                <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+<dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

@@ -1,0 +1,11 @@
+target/
+**/target/
+.git/
+.gitignore
+.vscode/
+frontend/
+integration-tests/
+proyecto_so2_saberpro/
+*.docx
+*.pdf
+.env
