@@ -51,11 +51,191 @@
   ],
   "users": [
     {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@unicauca.edu.co",
+      "firstName": "Admin",
+      "lastName": "General",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMINISTRADOR"
+      ]
+    },
+    {
+      "username": "Juan1",
+      "enabled": true,
+      "email": "juan1@unicauca.edu.co",
+      "firstName": "Juan",
+      "lastName": "Perez",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMINISTRADOR"
+      ]
+    },
+    {
+      "username": "pepe12",
+      "enabled": true,
+      "email": "pepe12@unicauca.edu.co",
+      "firstName": "Pepito",
+      "lastName": "Manuel",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMINISTRADOR"
+      ]
+    },
+    {
+      "username": "Juan11",
+      "enabled": true,
+      "email": "juan11@unicauca.edu.co",
+      "firstName": "Juan",
+      "lastName": "Once",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMINISTRADOR"
+      ]
+    },
+    {
       "username": "autor1",
       "enabled": true,
       "email": "autor1@unicauca.edu.co",
       "firstName": "Autor",
-      "lastName": "Prueba",
+      "lastName": "Uno",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Autor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "AUTOR"
+      ]
+    },
+    {
+      "username": "autor",
+      "enabled": true,
+      "email": "autor@unicauca.edu.co",
+      "firstName": "Autor",
+      "lastName": "Preguntas",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Autor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "AUTOR"
+      ]
+    },
+    {
+      "username": "juan12",
+      "enabled": true,
+      "email": "juan12@unicauca.edu.co",
+      "firstName": "Juan",
+      "lastName": "Perez",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Autor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "AUTOR"
+      ]
+    },
+    {
+      "username": "autor12",
+      "enabled": true,
+      "email": "autor12@unicauca.edu.co",
+      "firstName": "Juan",
+      "lastName": "Perez",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Autor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "AUTOR"
+      ]
+    },
+    {
+      "username": "juan2",
+      "enabled": true,
+      "email": "juan2@unicauca.edu.co",
+      "firstName": "Juanito",
+      "lastName": "Gomez",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Autor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "AUTOR"
+      ]
+    },
+    {
+      "username": "ana",
+      "enabled": true,
+      "email": "ana@unicauca.edu.co",
+      "firstName": "Ana",
+      "lastName": "Autor",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Autor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "AUTOR"
+      ]
+    },
+    {
+      "username": "carlos",
+      "enabled": true,
+      "email": "carlos@unicauca.edu.co",
+      "firstName": "Carlos",
+      "lastName": "Autor",
       "emailVerified": true,
       "credentials": [
         {
@@ -105,23 +285,112 @@
       ]
     },
     {
-      "username": "admin",
+      "username": "Juanita",
       "enabled": true,
-      "email": "admin@unicauca.edu.co",
-      "firstName": "Admin",
-      "lastName": "General",
+      "email": "juanita@unicauca.edu.co",
+      "firstName": "Juana",
+      "lastName": "Perez",
       "emailVerified": true,
       "credentials": [
         {
           "type": "password",
-          "value": "Admin1234!",
+          "value": "Revisor1234!",
           "temporary": false
         }
       ],
       "realmRoles": [
-        "ADMINISTRADOR"
+        "REVISOR"
+      ]
+    },
+    {
+      "username": "Juan6",
+      "enabled": true,
+      "email": "juan6@unicauca.edu.co",
+      "firstName": "Juan",
+      "lastName": "Garcia",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Revisor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "REVISOR"
+      ]
+    },
+    {
+      "username": "Juan13",
+      "enabled": true,
+      "email": "juan13@unicauca.edu.co",
+      "firstName": "Juan",
+      "lastName": "Trece",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Revisor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "REVISOR"
+      ]
+    },
+    {
+      "username": "Cuarto",
+      "enabled": true,
+      "email": "cuarto@unicauca.edu.co",
+      "firstName": "Cuarto",
+      "lastName": "Revisor",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Revisor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "REVISOR"
+      ]
+    },
+    {
+      "username": "rev1",
+      "enabled": true,
+      "email": "rev1@unicauca.edu.co",
+      "firstName": "Revisor",
+      "lastName": "Uno",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Revisor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "REVISOR"
+      ]
+    },
+    {
+      "username": "rev2",
+      "enabled": true,
+      "email": "rev2@unicauca.edu.co",
+      "firstName": "Revisor",
+      "lastName": "Dos",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Revisor1234!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "REVISOR"
       ]
     }
   ]
 }
-

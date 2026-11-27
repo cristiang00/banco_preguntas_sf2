@@ -137,9 +137,9 @@ foreach ($s in $services) {
         $outLog = Join-Path $logsDir "$($s.Name).log"
         $errLog = Join-Path $logsDir "$($s.Name)-err.log"
         if ($Console) {
-            Start-Process cmd.exe -ArgumentList @("/k", "title $($s.Name) [$($s.Port)] & java -jar `"$($s.Jar)`"")
+            Start-Process cmd.exe -ArgumentList @("/k", "title $($s.Name) [$($s.Port)] & java -jar `"$($s.Jar)`"") -WorkingDirectory $PSScriptRoot
         } else {
-            Start-Process -FilePath "java" -ArgumentList @("-jar", $s.Jar) -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+            Start-Process -FilePath "java" -ArgumentList @("-jar", $s.Jar) -WorkingDirectory $PSScriptRoot -RedirectStandardOutput $outLog -RedirectStandardError $errLog
         }
     }
 }
