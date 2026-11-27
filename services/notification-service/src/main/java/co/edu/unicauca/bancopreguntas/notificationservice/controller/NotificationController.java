@@ -5,8 +5,11 @@ import co.edu.unicauca.bancopreguntas.contracts.events.EventParser;
 import co.edu.unicauca.bancopreguntas.notificationservice.model.NotificacionEntity;
 import co.edu.unicauca.bancopreguntas.notificationservice.service.NotificacionService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,7 +27,13 @@ public class NotificationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('AUTOR', 'REVISOR', 'ADMINISTRADOR')")
     @Operation(summary = "Listar notificaciones registradas", description = "Permite filtrar por destinatario o listar todo el historial")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Notificaciones listadas"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado")
+    })
     public ResponseEntity<List<NotificacionEntity>> listarNotificaciones(
             @RequestParam(value = "destinatario", required = false) String destinatario) {
         if (destinatario != null && !destinatario.isBlank()) {
@@ -34,7 +43,14 @@ public class NotificationController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('AUTOR', 'REVISOR', 'ADMINISTRADOR')")
     @Operation(summary = "Consultar notificación por ID")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Notificación encontrada"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado"),
+        @ApiResponse(responseCode = "404", description = "Notificación no encontrada")
+    })
     public ResponseEntity<NotificacionEntity> buscarPorId(@PathVariable(value = "id") Long id) {
         return notificacionService.buscarPorId(id)
                 .map(ResponseEntity::ok)
@@ -42,7 +58,13 @@ public class NotificationController {
     }
 
     @PostMapping("/eventos")
+    @PreAuthorize("hasAnyRole('AUTOR', 'REVISOR', 'ADMINISTRADOR')")
     @Operation(summary = "Ingestar y procesar evento de dominio para generación de notificaciones")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Evento procesado"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado")
+    })
     public ResponseEntity<?> recibirEvento(@RequestBody Map<String, Object> payload) {
         try {
             DomainEvent event = EventParser.parse(payload);

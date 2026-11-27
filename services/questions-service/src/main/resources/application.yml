@@ -19,9 +19,12 @@ spring:
 
 services:
   validation:
-    url: ${VALIDATION_SERVICE_URL:http://localhost:8083}
+    url: ${SERVICES_VALIDATION_URL:${VALIDATION_SERVICE_URL:http://localhost:8083}}
   lifecycle:
-    url: ${LIFECYCLE_SERVICE_URL:http://localhost:8084}
+    url: ${SERVICES_LIFECYCLE_URL:${LIFECYCLE_SERVICE_URL:http://localhost:8084}}
+
+keycloak:
+  jwks-url: ${KEYCLOAK_JWKS_URI:http://localhost:8089/realms/saberpro/protocol/openid-connect/certs}
 
 springdoc:
   api-docs:

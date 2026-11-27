@@ -1,4 +1,4 @@
-package co.edu.unicauca.bancopreguntas.review.domain;
+package co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -42,6 +42,8 @@ public class ObservacionEntity {
     public Long getPreguntaId() { return preguntaId; }
     public String getTexto() { return texto; }
     public LocalDateTime getFecha() { return fecha; }
+    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
     public boolean isVisibleAutor() { return visibleAutor; }
     public void setVisibleAutor(boolean visibleAutor) { this.visibleAutor = visibleAutor; }
 }
+

@@ -6,10 +6,13 @@ import co.edu.unicauca.bancopreguntas.contracts.dto.PreguntaDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.ResultadoValidacionDTO;
 import co.edu.unicauca.bancopreguntas.questions.client.LifecycleServiceClient;
 import co.edu.unicauca.bancopreguntas.questions.client.ValidationServiceClient;
+import co.edu.unicauca.bancopreguntas.questions.domain.OpcionEntity;
 import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaBuilder;
 import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaEntity;
+import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaVersionEntity;
 import co.edu.unicauca.bancopreguntas.questions.facade.QuestionQueryFacade;
 import co.edu.unicauca.bancopreguntas.questions.repository.PreguntaRepository;
+import co.edu.unicauca.bancopreguntas.questions.repository.PreguntaVersionRepository;
 import co.edu.unicauca.bancopreguntas.questions.service.QuestionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,8 +47,88 @@ class QuestionBuilderAndFacadeTest {
 
         @Override
         public Page<PreguntaEntity> findAll(Specification<PreguntaEntity> spec, Pageable pageable) {
-            List<PreguntaEntity> list = new ArrayList<>(database.values());
-            return new PageImpl<>(list, pageable, list.size());
+            List<PreguntaEntity> filtered = database.values().stream()
+                    .filter(entity -> matchesSpec(spec, entity))
+                    .sorted(Comparator.comparing(PreguntaEntity::getId, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .toList();
+            if (pageable == null || pageable.isUnpaged()) {
+                return new PageImpl<>(filtered);
+            }
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), filtered.size());
+            List<PreguntaEntity> pageContent = (start < filtered.size())
+                    ? filtered.subList(start, end)
+                    : Collections.emptyList();
+            return new PageImpl<>(pageContent, pageable, filtered.size());
+        }
+
+        private interface ValHolder { Object __val(); }
+        private interface PredHolder { boolean __ok(); }
+
+        @SuppressWarnings("unchecked")
+        private static boolean matchesSpec(Specification<PreguntaEntity> spec, PreguntaEntity entity) {
+            if (spec == null) return true;
+            ClassLoader cl = StubPreguntaRepository.class.getClassLoader();
+            jakarta.persistence.criteria.Root<PreguntaEntity> root = (jakarta.persistence.criteria.Root<PreguntaEntity>)
+                    java.lang.reflect.Proxy.newProxyInstance(cl, new Class[]{jakarta.persistence.criteria.Root.class}, (p, m, args) -> {
+                        if ("get".equals(m.getName()) && args != null && args.length == 1 && args[0] instanceof String field) {
+                            Object val = switch (field) {
+                                case "autorId" -> entity.getAutorId();
+                                case "estadoProyeccion" -> entity.getEstadoProyeccion();
+                                case "nivelDificultad" -> entity.getNivelDificultad();
+                                case "competencia" -> entity.getCompetencia();
+                                default -> null;
+                            };
+                            return makePathProxy(cl, val);
+                        }
+                        return null;
+                    });
+
+            jakarta.persistence.criteria.CriteriaBuilder cb = (jakarta.persistence.criteria.CriteriaBuilder)
+                    java.lang.reflect.Proxy.newProxyInstance(cl, new Class[]{jakarta.persistence.criteria.CriteriaBuilder.class}, (p, m, args) -> {
+                        String name = m.getName();
+                        if ("equal".equals(name) && args != null && args.length == 2) {
+                            Object left = (args[0] instanceof ValHolder vh) ? vh.__val() : args[0];
+                            Object right = (args[1] instanceof ValHolder vh) ? vh.__val() : args[1];
+                            return makePredProxy(cl, Objects.equals(left, right));
+                        }
+                        if ("upper".equals(name) && args != null && args.length == 1) {
+                            Object v = (args[0] instanceof ValHolder vh) ? vh.__val() : args[0];
+                            return makePathProxy(cl, v != null ? v.toString().toUpperCase() : null);
+                        }
+                        if ("and".equals(name) && args != null && args.length == 1 && args[0] instanceof jakarta.persistence.criteria.Predicate[] arr) {
+                            boolean all = Arrays.stream(arr).allMatch(pr -> !(pr instanceof PredHolder ph) || ph.__ok());
+                            return makePredProxy(cl, all);
+                        }
+                        return makePredProxy(cl, true);
+                    });
+
+            jakarta.persistence.criteria.Predicate pred = spec.toPredicate(root, null, cb);
+            return !(pred instanceof PredHolder ph) || ph.__ok();
+        }
+
+        private static Object makePathProxy(ClassLoader cl, Object val) {
+            return java.lang.reflect.Proxy.newProxyInstance(cl,
+                    new Class[]{jakarta.persistence.criteria.Path.class, ValHolder.class}, (p, m, args) -> {
+                        if ("__val".equals(m.getName())) return val;
+                        if ("in".equals(m.getName()) && args != null && args.length == 1) {
+                            if (args[0] instanceof Collection<?> col) {
+                                return makePredProxy(cl, col.contains(val));
+                            }
+                            if (args[0] instanceof Object[] arr) {
+                                return makePredProxy(cl, Arrays.asList(arr).contains(val));
+                            }
+                        }
+                        return null;
+                    });
+        }
+
+        private static jakarta.persistence.criteria.Predicate makePredProxy(ClassLoader cl, boolean ok) {
+            return (jakarta.persistence.criteria.Predicate) java.lang.reflect.Proxy.newProxyInstance(cl,
+                    new Class[]{jakarta.persistence.criteria.Predicate.class, PredHolder.class}, (p, m, args) -> {
+                        if ("__ok".equals(m.getName())) return ok;
+                        return null;
+                    });
         }
 
         @Override public Page<PreguntaEntity> findByAutorId(Long autorId, Pageable pageable) { return null; }
@@ -107,7 +190,58 @@ class QuestionBuilderAndFacadeTest {
         @Override public void crearNuevaVersion(Long pId, Long uId) {}
     }
 
+    static class StubPreguntaVersionRepository implements PreguntaVersionRepository {
+        List<PreguntaVersionEntity> versiones = new ArrayList<>();
+        long seq = 1;
+
+        @Override
+        public <S extends PreguntaVersionEntity> S save(S entity) {
+            if (entity.getId() == null) entity.setId(seq++);
+            versiones.add(entity);
+            return entity;
+        }
+
+        @Override
+        public List<PreguntaVersionEntity> findByPreguntaIdOrderByVersionAsc(Long preguntaId) {
+            return versiones.stream()
+                    .filter(v -> preguntaId.equals(v.getPreguntaId()))
+                    .sorted(Comparator.comparingInt(PreguntaVersionEntity::getVersion))
+                    .toList();
+        }
+
+        @Override public <S extends PreguntaVersionEntity> List<S> saveAll(Iterable<S> entities) { return null; }
+        @Override public Optional<PreguntaVersionEntity> findById(Long aLong) { return Optional.empty(); }
+        @Override public boolean existsById(Long aLong) { return false; }
+        @Override public List<PreguntaVersionEntity> findAll() { return versiones; }
+        @Override public List<PreguntaVersionEntity> findAllById(Iterable<Long> longs) { return null; }
+        @Override public long count() { return versiones.size(); }
+        @Override public void deleteById(Long aLong) {}
+        @Override public void delete(PreguntaVersionEntity entity) {}
+        @Override public void deleteAllById(Iterable<? extends Long> longs) {}
+        @Override public void deleteAll(Iterable<? extends PreguntaVersionEntity> entities) {}
+        @Override public void deleteAll() { versiones.clear(); }
+        @Override public void flush() {}
+        @Override public <S extends PreguntaVersionEntity> S saveAndFlush(S entity) { return save(entity); }
+        @Override public <S extends PreguntaVersionEntity> List<S> saveAllAndFlush(Iterable<S> entities) { return null; }
+        @Override public void deleteAllInBatch(Iterable<PreguntaVersionEntity> entities) {}
+        @Override public void deleteAllByIdInBatch(Iterable<Long> longs) {}
+        @Override public void deleteAllInBatch() {}
+        @Override public PreguntaVersionEntity getOne(Long aLong) { return null; }
+        @Override public PreguntaVersionEntity getById(Long aLong) { return null; }
+        @Override public PreguntaVersionEntity getReferenceById(Long aLong) { return null; }
+        @Override public <S extends PreguntaVersionEntity> Optional<S> findOne(org.springframework.data.domain.Example<S> example) { return Optional.empty(); }
+        @Override public <S extends PreguntaVersionEntity> List<S> findAll(org.springframework.data.domain.Example<S> example) { return null; }
+        @Override public <S extends PreguntaVersionEntity> List<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Sort sort) { return null; }
+        @Override public <S extends PreguntaVersionEntity> Page<S> findAll(org.springframework.data.domain.Example<S> example, Pageable pageable) { return null; }
+        @Override public <S extends PreguntaVersionEntity> long count(org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends PreguntaVersionEntity> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
+        @Override public <S extends PreguntaVersionEntity, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
+        @Override public List<PreguntaVersionEntity> findAll(org.springframework.data.domain.Sort sort) { return null; }
+        @Override public Page<PreguntaVersionEntity> findAll(Pageable pageable) { return null; }
+    }
+
     private StubPreguntaRepository repo;
+    private StubPreguntaVersionRepository versionRepo;
     private StubValidationClient validationClient;
     private StubLifecycleClient lifecycleClient;
     private QuestionQueryFacade queryFacade;
@@ -116,10 +250,11 @@ class QuestionBuilderAndFacadeTest {
     @BeforeEach
     void setUp() {
         repo = new StubPreguntaRepository();
+        versionRepo = new StubPreguntaVersionRepository();
         validationClient = new StubValidationClient();
         lifecycleClient = new StubLifecycleClient();
         queryFacade = new QuestionQueryFacade(repo, lifecycleClient);
-        questionService = new QuestionService(repo, validationClient, lifecycleClient, queryFacade);
+        questionService = new QuestionService(repo, validationClient, lifecycleClient, queryFacade, versionRepo);
     }
 
     @Test
@@ -392,11 +527,48 @@ class QuestionBuilderAndFacadeTest {
         repo.save(mia);
         repo.save(ajena);
 
-        // Con autorId=3L (AUTOR solo ve las suyas)
+        // Con autorId=3L (AUTOR solo ve las suyas, excluyendo las de autorId=99L)
         Map<String, Object> resultado = queryFacade.listarPreguntas(3L, null, "TODOS", 0, 10);
-        // El stub devuelve todos porque no filtra por authorId en Specification,
-        // pero verificamos que la fachada invoca correctamente con 2 elementos
-        assertNotNull(resultado.get("content"));
+        assertEquals(1L, resultado.get("totalElements"));
+        @SuppressWarnings("unchecked")
+        List<PreguntaDTO> items = (List<PreguntaDTO>) resultado.get("content");
+        assertEquals(1, items.size());
+        assertEquals(60L, items.get(0).getId());
+        assertEquals(3L, items.get(0).getAutorId());
+    }
+
+    @Test
+    @DisplayName("HU10.S1.2 - Facade aplica filtros combinados (estado + dificultad) antes de paginar")
+    void facade_listarPreguntas_filtrosCombinadosYPaginacionExacta() {
+        repo.save(new PreguntaBuilder().conId(201L).conContexto("P1").conPreguntaDirecta("¿1?")
+                .conAutorId(3L).conEstado(EstadoPreguntaDTO.BORRADOR).conNivelDificultad("Medio").conVersion(1).build());
+        repo.save(new PreguntaBuilder().conId(202L).conContexto("P2").conPreguntaDirecta("¿2?")
+                .conAutorId(3L).conEstado(EstadoPreguntaDTO.BORRADOR).conNivelDificultad("Medio").conVersion(1).build());
+        repo.save(new PreguntaBuilder().conId(203L).conContexto("P3").conPreguntaDirecta("¿3?")
+                .conAutorId(3L).conEstado(EstadoPreguntaDTO.BORRADOR).conNivelDificultad("Medio").conVersion(1).build());
+        repo.save(new PreguntaBuilder().conId(204L).conContexto("P4").conPreguntaDirecta("¿4?")
+                .conAutorId(3L).conEstado(EstadoPreguntaDTO.RECHAZADA).conNivelDificultad("Medio").conVersion(1).build());
+        repo.save(new PreguntaBuilder().conId(205L).conContexto("P5").conPreguntaDirecta("¿5?")
+                .conAutorId(3L).conEstado(EstadoPreguntaDTO.BORRADOR).conNivelDificultad("Alto").conVersion(1).build());
+
+        Map<String, Object> page0 = queryFacade.listarPreguntas(
+                3L, List.of(EstadoPreguntaDTO.BORRADOR), "medio", 0, 2
+        );
+        assertEquals(3L, page0.get("totalElements"));
+        assertEquals(2, page0.get("totalPages"));
+        @SuppressWarnings("unchecked")
+        List<PreguntaDTO> content0 = (List<PreguntaDTO>) page0.get("content");
+        assertEquals(2, content0.size());
+        assertEquals(203L, content0.get(0).getId());
+        assertEquals(202L, content0.get(1).getId());
+
+        Map<String, Object> page1 = queryFacade.listarPreguntas(
+                3L, List.of(EstadoPreguntaDTO.BORRADOR), "medio", 1, 2
+        );
+        @SuppressWarnings("unchecked")
+        List<PreguntaDTO> content1 = (List<PreguntaDTO>) page1.get("content");
+        assertEquals(1, content1.size());
+        assertEquals(201L, content1.get(0).getId());
     }
 
     @Test
@@ -437,5 +609,70 @@ class QuestionBuilderAndFacadeTest {
         Map<String, Object> resultado = queryFacade.listarPreguntas(null, null, "TODOS", 0, 10);
         assertNotNull(resultado);
         assertEquals(1L, resultado.get("totalElements"));
+    }
+
+    @Test
+    @DisplayName("HU6.S3 - Crear nueva versión conserva snapshot inmutable de la versión anterior")
+    void crearNuevaVersion_conservaVersionAnteriorEnHistorial() {
+        PreguntaEntity p = new PreguntaBuilder()
+                .conId(80L)
+                .conContexto("Contexto v1")
+                .conPreguntaDirecta("¿Pregunta v1?")
+                .conOpcion("A", "Op A").conOpcion("B", "Op B")
+                .conOpcion("C", "Op C").conOpcion("D", "Op D")
+                .conRespuestaCorrecta("A")
+                .conJustificacion("Just v1")
+                .conBibliografia("Bib v1")
+                .conCompetencia("Lectura Crítica")
+                .conTema("Tema").conSubtema("Subtema").conNivelDificultad("Medio")
+                .conAutorId(3L).conEstado(EstadoPreguntaDTO.RECHAZADA).conVersion(1)
+                .build();
+        repo.save(p);
+
+        PreguntaDTO cambios = new PreguntaDTO();
+        cambios.setContexto("Contexto mejorado v2");
+        PreguntaDTO v2 = questionService.crearNuevaVersion(80L, cambios, 3L);
+
+        assertEquals(2, v2.getVersion());
+        assertEquals("Contexto mejorado v2", v2.getContexto());
+        assertEquals("BORRADOR", v2.getEstado());
+
+        List<PreguntaVersionEntity> historial = questionService.listarVersionesAnteriores(80L);
+        assertEquals(1, historial.size());
+        assertEquals(1, historial.get(0).getVersion());
+        assertEquals("Contexto v1", historial.get(0).getContexto());
+        assertEquals(EstadoPreguntaDTO.RECHAZADA, historial.get(0).getEstadoAlArchivar());
+    }
+
+    @Test
+    @DisplayName("HU6.S3.2 - Crear nueva versión aplica validación estructural HU1 y rechaza si es inválida")
+    void crearNuevaVersion_validacionInvalida_lanzaValidationExceptionYNoArchiva() {
+        PreguntaEntity p = new PreguntaBuilder()
+                .conId(81L).conContexto("Ctx").conPreguntaDirecta("¿?")
+                .conAutorId(3L).conEstado(EstadoPreguntaDTO.RECHAZADA).conVersion(1)
+                .build();
+        repo.save(p);
+        validationClient.valida = false;
+
+        assertThrows(QuestionService.ValidationException.class, () ->
+                questionService.crearNuevaVersion(81L, null, 3L));
+        assertEquals(1, p.getVersion());
+        assertEquals(EstadoPreguntaDTO.RECHAZADA, p.getEstadoProyeccion());
+        assertTrue(versionRepo.versiones.isEmpty());
+    }
+
+    @Test
+    @DisplayName("HU10.S1.1 - OpcionEntity y PreguntaEntity conservan clave, texto, orden y valores por defecto")
+    void opcionEntityYPreguntaEntity_camposYDefaults() {
+        OpcionEntity op = new OpcionEntity("B", "Respuesta correcta", 2);
+        op.setId(10L);
+        assertEquals(10L, op.getId());
+        assertEquals("B", op.getClave());
+        assertEquals("Respuesta correcta", op.getTexto());
+        assertEquals(2, op.getOrden());
+
+        PreguntaEntity entity = new PreguntaEntity();
+        assertEquals(1, entity.getVersion());
+        assertEquals(EstadoPreguntaDTO.BORRADOR, entity.getEstadoProyeccion());
     }
 }

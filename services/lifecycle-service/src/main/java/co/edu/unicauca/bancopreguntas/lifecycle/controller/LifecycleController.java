@@ -3,6 +3,7 @@ package co.edu.unicauca.bancopreguntas.lifecycle.controller;
 import co.edu.unicauca.bancopreguntas.contracts.dto.EstadoPreguntaDTO;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.state.AccesoDenegadoException;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.state.TransicionInvalidaException;
+import co.edu.unicauca.bancopreguntas.lifecycle.security.ResourceServerSecurityConfig;
 import co.edu.unicauca.bancopreguntas.lifecycle.service.LifecycleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -10,13 +11,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
-@Tag(name = "Ciclo de Vida", description = "Gestión de estados, patrón State y transiciones de preguntas")
+@Tag(name = "Ciclo de Vida", description = "Gestión de estados, patrón State y transiciones de preguntas (HU2, HU6, HU7)")
 public class LifecycleController {
 
     private final LifecycleService lifecycleService;
@@ -26,18 +30,21 @@ public class LifecycleController {
     }
 
     @PutMapping("/preguntas/{id}/enviar-revision")
+    @PreAuthorize("hasAnyRole('AUTOR', 'ADMINISTRADOR')")
     @Operation(summary = "Enviar pregunta a revisión (HU2 - SSCRUM-42 a SSCRUM-45 / HU6.S5)")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Pregunta enviada a revisión exitosamente"),
-        @ApiResponse(responseCode = "403", description = "El usuario no es el autor de la pregunta"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "El usuario no es el autor de la pregunta o rol no autorizado"),
         @ApiResponse(responseCode = "409", description = "Transición inválida: la pregunta no está en Borrador")
     })
     public ResponseEntity<?> enviarARevision(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", required = true) Long userId,
-            @RequestHeader(value = "X-User-Name", required = false, defaultValue = "") String userName,
+            @AuthenticationPrincipal Jwt jwt,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
             @RequestBody(required = false) Map<String, Object> body) {
+        Long userId = ResourceServerSecurityConfig.extractUserId(jwt);
+        String userName = ResourceServerSecurityConfig.extractUsername(jwt);
         try {
             String contexto = (body != null && body.containsKey("contexto")) ? String.valueOf(body.get("contexto")) : "Pregunta #" + id;
             String preguntaDirecta = (body != null && body.containsKey("preguntaDirecta")) ? String.valueOf(body.get("preguntaDirecta")) : "";
@@ -63,16 +70,19 @@ public class LifecycleController {
     }
 
     @PutMapping("/preguntas/{id}/nueva-version")
+    @PreAuthorize("hasAnyRole('AUTOR', 'ADMINISTRADOR')")
     @Operation(summary = "Crear nueva versión mejorada de pregunta rechazada (HU6.S3 / HU6.S4)")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Nueva versión creada exitosamente en estado Borrador"),
-        @ApiResponse(responseCode = "403", description = "El usuario no es el autor de la pregunta"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "El usuario no es el autor de la pregunta o rol no autorizado"),
         @ApiResponse(responseCode = "409", description = "Transición inválida: la pregunta no está en estado Rechazada")
     })
     public ResponseEntity<?> crearNuevaVersion(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId) {
+        Long userId = ResourceServerSecurityConfig.extractUserId(jwt);
         try {
             EstadoPreguntaDTO nuevoEstado = lifecycleService.crearNuevaVersion(id, userId, correlationId);
             return ResponseEntity.ok(Map.of(
@@ -92,7 +102,13 @@ public class LifecycleController {
     }
 
     @GetMapping("/ciclo-vida/preguntas/{id}/estado")
+    @PreAuthorize("hasAnyRole('AUTOR', 'REVISOR', 'ADMINISTRADOR')")
     @Operation(summary = "Consultar estado actual y color de una pregunta (HU2 - SSCRUM-44)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Estado consultado"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado")
+    })
     public ResponseEntity<?> obtenerEstado(@PathVariable(value = "id") Long id) {
         EstadoPreguntaDTO estado = lifecycleService.obtenerEstado(id);
         return ResponseEntity.ok(Map.of(
@@ -104,7 +120,13 @@ public class LifecycleController {
     }
 
     @GetMapping("/ciclo-vida/preguntas/{id}/puede-editar")
+    @PreAuthorize("hasAnyRole('AUTOR', 'ADMINISTRADOR')")
     @Operation(summary = "Verificar si la pregunta puede ser editada (HU2 - SSCRUM-46)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Resultado de editabilidad"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado")
+    })
     public ResponseEntity<?> puedeEditar(@PathVariable(value = "id") Long id) {
         boolean editable = lifecycleService.puedeEditar(id);
         return ResponseEntity.ok(Map.of(
@@ -114,7 +136,13 @@ public class LifecycleController {
     }
 
     @PostMapping("/ciclo-vida/preguntas/{id}/inicializar")
+    @PreAuthorize("hasAnyRole('AUTOR', 'ADMINISTRADOR')")
     @Operation(summary = "Inicializar ciclo de vida de una nueva pregunta en Borrador")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Ciclo de vida inicializado"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado")
+    })
     public ResponseEntity<?> inicializarPregunta(
             @PathVariable(value = "id") Long id,
             @RequestParam(value = "autorId") Long autorId) {
@@ -123,7 +151,13 @@ public class LifecycleController {
     }
 
     @PutMapping("/ciclo-vida/preguntas/{id}/estado")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(summary = "Actualizar administrativamente el estado de una pregunta")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Estado actualizado"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado: solo ADMINISTRADOR")
+    })
     public ResponseEntity<?> cambiarEstado(
             @PathVariable(value = "id") Long id,
             @RequestParam(value = "estado") String estado) {
@@ -138,12 +172,20 @@ public class LifecycleController {
     }
 
     @PutMapping("/ciclo-vida/preguntas/{id}/decision")
+    @PreAuthorize("hasAnyRole('REVISOR', 'ADMINISTRADOR')")
     @Operation(summary = "Aplicar decisión de revisores (Aprobada / Rechazada) coordinada desde Review Service")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Decisión aplicada"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado: rol REVISOR o ADMINISTRADOR requerido"),
+        @ApiResponse(responseCode = "409", description = "Transición inválida")
+    })
     public ResponseEntity<?> aplicarDecision(
             @PathVariable(value = "id") Long id,
-            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @AuthenticationPrincipal Jwt jwt,
             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
             @RequestBody Map<String, Object> body) {
+        Long userId = ResourceServerSecurityConfig.extractUserId(jwt);
         try {
             String decision = (String) body.get("decision");
             String autorEmail = (String) body.get("autorEmail");

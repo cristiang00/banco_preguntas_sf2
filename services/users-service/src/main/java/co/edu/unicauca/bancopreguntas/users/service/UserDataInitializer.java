@@ -94,15 +94,19 @@ public class UserDataInitializer implements CommandLineRunner {
     private void crearUsuariosPorDefecto() {
         String defaultHash = passwordHasher.hash("Password123!@");
 
-        crearSiNoExiste("Juan1", "Juan Pérez", "admin@unicauca.edu.co", Rol.ADMINISTRADOR, defaultHash);
-        crearSiNoExiste("admin", "Administrador Principal", "admin.principal@unicauca.edu.co", Rol.ADMINISTRADOR, defaultHash);
+        // Orden alineado con el mapeo de IDs de Keycloak en JwtValidator / ApiClient:
+        // 1=admin, 2=autor1, 3=juan12 (preguntas iniciales), 4=revisor1, 5=revisor2
+        crearSiNoExiste("admin", "Administrador Principal", "admin@unicauca.edu.co", Rol.ADMINISTRADOR, defaultHash);
+        crearSiNoExiste("autor1", "Autor Prueba", "autor1@unicauca.edu.co", Rol.AUTOR, defaultHash);
         crearSiNoExiste("juan12", "Juan Pérez (Autor)", "juan12@unicauca.edu.co", Rol.AUTOR, defaultHash);
+        crearSiNoExiste("revisor1", "Revisor Uno", "revisor1@unicauca.edu.co", Rol.REVISOR, defaultHash);
+        crearSiNoExiste("revisor2", "Revisor Dos", "revisor2@unicauca.edu.co", Rol.REVISOR, defaultHash);
+        crearSiNoExiste("Juan1", "Juan Pérez", "juan1@unicauca.edu.co", Rol.ADMINISTRADOR, defaultHash);
         crearSiNoExiste("juan2", "Juanito Gómez (Autor)", "juan2@unicauca.edu.co", Rol.AUTOR, defaultHash);
         crearSiNoExiste("autor", "Autor de Preguntas", "autor@unicauca.edu.co", Rol.AUTOR, defaultHash);
         crearSiNoExiste("Juanita", "Juana Pérez (Revisora)", "juanita@unicauca.edu.co", Rol.REVISOR, defaultHash);
         crearSiNoExiste("Juan6", "Juan García (Revisor)", "juan6@unicauca.edu.co", Rol.REVISOR, defaultHash);
         crearSiNoExiste("Juan13", "Tercer Revisor", "juan13@unicauca.edu.co", Rol.REVISOR, defaultHash);
-        crearSiNoExiste("revisor1", "Revisor Docente 1", "revisor1@unicauca.edu.co", Rol.REVISOR, defaultHash);
     }
 
     private void crearSiNoExiste(String username, String fullName, String email, Rol rol, String hash) {

@@ -5,6 +5,7 @@ import co.edu.unicauca.bancopreguntas.contracts.events.RabbitMQConstants;
 import co.edu.unicauca.bancopreguntas.contracts.events.RemoteEventDispatcher;
 import co.edu.unicauca.bancopreguntas.contracts.observer.DomainEventBus;
 import co.edu.unicauca.bancopreguntas.contracts.observer.EventPublisher;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.security.ResourceServerSecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +78,7 @@ public class ReviewEventPublisher implements EventPublisher {
             springPublisher.publishEvent(event);
         }
 
+        String bearerToken = ResourceServerSecurityConfig.currentBearerToken();
         try {
             String json = objectMapper.writeValueAsString(event);
             if (rabbitTemplate != null) {
@@ -85,13 +87,13 @@ public class ReviewEventPublisher implements EventPublisher {
                 log.info("[ReviewEventPublisher] Evento publicado en RabbitMQ exchange '{}' (routingKey={})",
                         RabbitMQConstants.EXCHANGE_NAME, routingKey);
             } else {
-                RemoteEventDispatcher.dispatchAsync(json, notificationServiceUrl, auditServiceUrl);
+                RemoteEventDispatcher.dispatchAsync(json, notificationServiceUrl, auditServiceUrl, bearerToken);
             }
         } catch (Exception e) {
             log.warn("Error enviando evento distribuido, intentando fallback HTTP: {}", e.getMessage());
             try {
                 String json = objectMapper.writeValueAsString(event);
-                RemoteEventDispatcher.dispatchAsync(json, notificationServiceUrl, auditServiceUrl);
+                RemoteEventDispatcher.dispatchAsync(json, notificationServiceUrl, auditServiceUrl, bearerToken);
             } catch (Exception ex) {
                 log.error("Fallo crítico serializando evento: {}", ex.getMessage());
             }

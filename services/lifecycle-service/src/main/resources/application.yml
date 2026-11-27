@@ -17,10 +17,19 @@ spring:
       hibernate:
         dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
 
+services:
+  questions:
+    url: ${SERVICES_QUESTIONS_URL:http://localhost:8082}
+  review:
+    url: ${SERVICES_REVIEW_URL:http://localhost:8085}
+
 rabbitmq:
   host: ${RABBITMQ_HOST:localhost}
   port: ${RABBITMQ_PORT:5672}
   exchange: saberpro.events
+
+keycloak:
+  jwks-url: ${KEYCLOAK_JWKS_URI:http://localhost:8089/realms/saberpro/protocol/openid-connect/certs}
 
 springdoc:
   api-docs:
@@ -31,6 +40,9 @@ springdoc:
 
 
 management:
+  health:
+    rabbit:
+      enabled: ${RABBIT_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:

@@ -1,6 +1,7 @@
 package co.edu.unicauca.bancopreguntas.questions.client;
 
 import co.edu.unicauca.bancopreguntas.contracts.dto.EstadoPreguntaDTO;
+import co.edu.unicauca.bancopreguntas.questions.security.ResourceServerSecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,7 @@ public class LifecycleServiceClient {
         factory.setConnectTimeout(2000);
         factory.setReadTimeout(3000);
         this.restTemplate = new RestTemplate(factory);
+        this.restTemplate.getInterceptors().add(ResourceServerSecurityConfig.bearerForwardingInterceptor());
         this.lifecycleServiceUrl = lifecycleServiceUrl;
     }
 
@@ -98,6 +100,11 @@ public class LifecycleServiceClient {
                     entity,
                     Map.class
             );
+        } catch (org.springframework.web.client.HttpClientErrorException.Conflict e) {
+            throw new co.edu.unicauca.bancopreguntas.questions.service.QuestionService.ConflictException(
+                    "El servicio de ciclo de vida rechazó la transición a nueva versión: la pregunta no está en estado Rechazada");
+        } catch (org.springframework.web.client.HttpClientErrorException.Forbidden e) {
+            throw new SecurityException("No tiene permisos en el servicio de ciclo de vida para versionar esta pregunta");
         } catch (Exception e) {
             log.warn("Fallo notificando transición de nueva versión a Lifecycle Service: {}", e.getMessage());
         }

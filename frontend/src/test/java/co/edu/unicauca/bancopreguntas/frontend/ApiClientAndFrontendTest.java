@@ -2,6 +2,7 @@ package co.edu.unicauca.bancopreguntas.frontend;
 
 import co.edu.unicauca.bancopreguntas.contracts.dto.TokenResponseDTO;
 import co.edu.unicauca.bancopreguntas.frontend.client.ApiClient;
+import co.edu.unicauca.bancopreguntas.frontend.client.ApiException;
 import co.edu.unicauca.bancopreguntas.frontend.utils.EstadoCellRenderer;
 import co.edu.unicauca.bancopreguntas.frontend.views.*;
 import com.sun.net.httpserver.HttpServer;
@@ -76,6 +77,34 @@ class ApiClientAndFrontendTest {
             assertEquals("AUTOR", token.getRol());
             assertEquals(2L, token.getUsuarioId());
             assertTrue(client.isAuthenticated());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("HU7.S2.4: Credenciales inválidas en Keycloak simulado responden 401 Unauthorized")
+    void testLoginWithKeycloakCredencialesInvalidas_responde401() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        int port = server.getAddress().getPort();
+
+        server.createContext("/realms/saberpro/protocol/openid-connect/token", exchange -> {
+            byte[] bytes = "{\"error\":\"invalid_grant\",\"error_description\":\"Invalid user credentials\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(401, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        try {
+            String kcUrl = "http://localhost:" + port + "/realms/saberpro/protocol/openid-connect/token";
+            ApiClient client = new ApiClient("http://localhost:8080/api/v1", kcUrl);
+
+            ApiException ex = assertThrows(ApiException.class, () -> client.login("autor1", "claveIncorrecta"));
+            assertEquals(401, ex.getStatusCode());
+            assertFalse(client.isAuthenticated());
         } finally {
             server.stop(0);
         }

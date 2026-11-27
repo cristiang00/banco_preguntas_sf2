@@ -1,13 +1,12 @@
 package co.edu.unicauca.bancopreguntas.users;
 
-import co.edu.unicauca.bancopreguntas.contracts.dto.TokenResponseDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.UserSummaryDTO;
 import co.edu.unicauca.bancopreguntas.users.domain.EstadoUsuario;
 import co.edu.unicauca.bancopreguntas.users.domain.Rol;
 import co.edu.unicauca.bancopreguntas.users.domain.UsuarioEntity;
 import co.edu.unicauca.bancopreguntas.users.repository.UsuarioRepository;
-import co.edu.unicauca.bancopreguntas.users.security.JwtUtil;
 import co.edu.unicauca.bancopreguntas.users.security.PasswordHasher;
+import co.edu.unicauca.bancopreguntas.users.security.ResourceServerSecurityConfig;
 import co.edu.unicauca.bancopreguntas.users.service.UsuarioService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +16,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.repository.query.FluentQuery;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,82 +27,44 @@ import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Pruebas unitarias de UsuarioService y mapeo de roles Keycloak (HU10.S3.1 / HU7.S2.3).
+ */
 class UsuarioServiceTest {
 
     private StubUsuarioRepository repository;
     private StubPasswordHasher hasher;
-    private JwtUtil jwtUtil;
     private UsuarioService service;
 
     @BeforeEach
     void setUp() {
         repository = new StubUsuarioRepository();
         hasher = new StubPasswordHasher();
-        jwtUtil = new JwtUtil("SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256", 3600000);
-        service = new UsuarioService(repository, hasher, jwtUtil);
-    }
-
-    // ─── Tests originales ─────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("Autenticacion exitosa con credenciales validas")
-    void autenticar_exitoso() {
-        UsuarioEntity user = new UsuarioEntity(1L, "juan12", "Juan Perez", "juan@unicauca.edu.co",
-                Rol.AUTOR, EstadoUsuario.ACTIVO, "hash123", LocalDateTime.now());
-        repository.save(user);
-        hasher.setResult(true);
-
-        TokenResponseDTO response = service.autenticar("juan12", "Password123!@");
-
-        assertNotNull(response);
-        assertEquals("juan12", response.getNombreUsuario());
-        assertEquals("AUTOR", response.getRol());
-        assertNotNull(response.getToken());
+        service = new UsuarioService(repository, hasher);
     }
 
     @Test
-    @DisplayName("Autenticacion fallida por contrasena incorrecta")
-    void autenticar_passwordInvalido() {
-        UsuarioEntity user = new UsuarioEntity(1L, "juan12", "Juan Perez", "juan@unicauca.edu.co",
-                Rol.AUTOR, EstadoUsuario.ACTIVO, "hash123", LocalDateTime.now());
-        repository.save(user);
-        hasher.setResult(false);
-
-        assertThrows(IllegalArgumentException.class, () -> service.autenticar("juan12", "Incorrecta"));
-    }
-
-    @Test
-    @DisplayName("Autenticacion rechazada para usuario inactivo")
-    void autenticar_usuarioInactivo() {
-        UsuarioEntity user = new UsuarioEntity(1L, "pepe12", "Pepito", "pepe@unicauca.edu.co",
-                Rol.ADMINISTRADOR, EstadoUsuario.INACTIVO, "hash123", LocalDateTime.now());
-        repository.save(user);
-
-        assertThrows(IllegalStateException.class, () -> service.autenticar("pepe12", "Password123!@"));
-    }
-
-    @Test
-    @DisplayName("Listar revisores activos")
+    @DisplayName("Listar revisores activos retorna solo usuarios con rol REVISOR y estado ACTIVO")
     void listarRevisores_retornaSoloRevisoresActivos() {
         UsuarioEntity revisor1 = new UsuarioEntity(6L, "Juanita", "Juana Perez", "juanita@unicauca.edu.co",
                 Rol.REVISOR, EstadoUsuario.ACTIVO, "hash", LocalDateTime.now());
         UsuarioEntity revisor2 = new UsuarioEntity(10L, "Juan6", "Juan Garcia", "juan6@unicauca.edu.co",
                 Rol.REVISOR, EstadoUsuario.ACTIVO, "hash", LocalDateTime.now());
+        UsuarioEntity revisorInactivo = new UsuarioEntity(11L, "Inactivo", "Rev Inactivo", "inact@unicauca.edu.co",
+                Rol.REVISOR, EstadoUsuario.INACTIVO, "hash", LocalDateTime.now());
         UsuarioEntity autor = new UsuarioEntity(1L, "juan12", "Juan Autor", "juan12@unicauca.edu.co",
                 Rol.AUTOR, EstadoUsuario.ACTIVO, "hash", LocalDateTime.now());
 
         repository.save(revisor1);
         repository.save(revisor2);
+        repository.save(revisorInactivo);
         repository.save(autor);
 
         List<UserSummaryDTO> revisores = service.listarRevisores();
 
         assertEquals(2, revisores.size());
-        assertEquals("Juanita", revisores.get(0).getNombreUsuario());
-        assertEquals("Juan6", revisores.get(1).getNombreUsuario());
+        assertTrue(revisores.stream().allMatch(r -> "REVISOR".equals(r.getRol()) && "ACTIVO".equals(r.getEstado())));
     }
-
-    // ─── HU10.S3.1: Tests adaptados al flujo Keycloak ────────────────────────
 
     @Test
     @DisplayName("HU10.S3.1 - Registro de usuario nuevo con rol AUTOR")
@@ -111,6 +75,7 @@ class UsuarioServiceTest {
         assertNotNull(dto);
         assertEquals("nuevoautor", dto.getNombreUsuario());
         assertEquals("AUTOR", dto.getRol());
+        assertEquals("ACTIVO", dto.getEstado());
         assertEquals(1, repository.count());
     }
 
@@ -126,7 +91,16 @@ class UsuarioServiceTest {
     }
 
     @Test
-    @DisplayName("HU10.S3.1 - Busqueda por ID retorna DTO con email (review-service lo usa para notificaciones)")
+    @DisplayName("HU10.S3.1 - Registro con username vacío o rol nulo lanza IllegalArgumentException")
+    void registrar_camposInvalidos_lanzaExcepcion() {
+        assertThrows(IllegalArgumentException.class, () ->
+                service.registrar("   ", "Nombre", "mail@u.co", "Pass1!", Rol.AUTOR));
+        assertThrows(IllegalArgumentException.class, () ->
+                service.registrar("userValid", "Nombre", "mail@u.co", "Pass1!", null));
+    }
+
+    @Test
+    @DisplayName("HU10.S3.1 - Búsqueda por ID retorna DTO con email (usado para notificaciones HU12)")
     void buscarPorId_existente_retornaDTOConEmail() {
         UsuarioEntity u = new UsuarioEntity(5L, "revisor1", "Revisor Uno", "revisor1@unicauca.edu.co",
                 Rol.REVISOR, EstadoUsuario.ACTIVO, "h", LocalDateTime.now());
@@ -140,13 +114,13 @@ class UsuarioServiceTest {
     }
 
     @Test
-    @DisplayName("HU10.S3.1 - Busqueda por ID inexistente retorna Optional vacio")
+    @DisplayName("HU10.S3.1 - Búsqueda por ID inexistente retorna Optional vacío")
     void buscarPorId_inexistente_retornaEmpty() {
         assertTrue(service.buscarPorId(999L).isEmpty());
     }
 
     @Test
-    @DisplayName("HU10.S3.1 - Busqueda por preferredUsername Keycloak es case-insensitive")
+    @DisplayName("HU10.S3.1 - Búsqueda por preferredUsername de Keycloak es case-insensitive")
     void buscarPorUsername_caseInsensitive() {
         UsuarioEntity u = new UsuarioEntity(2L, "Admin1", "Admin Uno", "admin@unicauca.edu.co",
                 Rol.ADMINISTRADOR, EstadoUsuario.ACTIVO, "h", LocalDateTime.now());
@@ -168,12 +142,26 @@ class UsuarioServiceTest {
         assertEquals(3, todos.size());
     }
 
+    @Test
+    @DisplayName("HU10.S3.1 / HU7 - Roles de dominio y extracción de authorities desde JWT Keycloak (realm_access)")
+    void rolesKeycloak_mapeoCorrectoAAuthorities() {
+        assertNotNull(Rol.valueOf("AUTOR"));
+        assertNotNull(Rol.valueOf("REVISOR"));
+        assertNotNull(Rol.valueOf("ADMINISTRADOR"));
+
+        Jwt jwt = new Jwt(
+                "token-val", Instant.now(), Instant.now().plusSeconds(300),
+                Map.of("alg", "RS256"),
+                Map.of("preferred_username", "admin", "realm_access", Map.of("roles", List.of("ADMINISTRADOR", "default-roles-saberpro")))
+        );
+        Collection<GrantedAuthority> authorities = ResourceServerSecurityConfig.extractAuthorities(jwt);
+        assertEquals(1, authorities.size());
+        assertEquals("ROLE_ADMINISTRADOR", authorities.iterator().next().getAuthority());
+    }
+
     // ─── Stubs ───────────────────────────────────────────────────────────────
 
     private static class StubPasswordHasher implements PasswordHasher {
-        private boolean result = true;
-        public void setResult(boolean result) { this.result = result; }
-
         @Override
         public String hash(String rawPassword) {
             return "hashed_" + rawPassword;
@@ -181,7 +169,7 @@ class UsuarioServiceTest {
 
         @Override
         public boolean verify(String rawPassword, String hashedPassword) {
-            return result;
+            return ("hashed_" + rawPassword).equals(hashedPassword);
         }
     }
 
@@ -197,16 +185,12 @@ class UsuarioServiceTest {
 
         @Override
         public List<UsuarioEntity> findByEstado(EstadoUsuario estado) {
-            return store.values().stream()
-                    .filter(u -> u.getEstado() == estado)
-                    .toList();
+            return store.values().stream().filter(u -> u.getEstado() == estado).toList();
         }
 
         @Override
         public List<UsuarioEntity> findByRolAndEstado(Rol rol, EstadoUsuario estado) {
-            return store.values().stream()
-                    .filter(u -> u.getRol() == rol && u.getEstado() == estado)
-                    .toList();
+            return store.values().stream().filter(u -> u.getRol() == rol && u.getEstado() == estado).toList();
         }
 
         @Override

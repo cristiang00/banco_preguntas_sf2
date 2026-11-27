@@ -5,5 +5,10 @@ target/
 *.iml
 .vscode/
 *.db
+*.mv.db
+*.trace.db
+data/
+services/*/data/
+.env
 .system_generated/
 

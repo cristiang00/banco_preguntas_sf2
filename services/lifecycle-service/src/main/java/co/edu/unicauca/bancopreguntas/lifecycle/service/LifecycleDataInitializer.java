@@ -29,14 +29,6 @@ public class LifecycleDataInitializer implements CommandLineRunner {
         if (!cicloVidaRepository.existsById(2L)) {
             cicloVidaRepository.save(new PreguntaCicloVidaEntity(2L, 3L, EstadoPreguntaDTO.PENDIENTE_REVISION));
             log.info("Inicializada Pregunta #2 en estado PENDIENTE_REVISION");
-        } else {
-            // Asegurar que la pregunta #2 esté en PENDIENTE_REVISION para que pueda asignarse en pruebas
-            PreguntaCicloVidaEntity p2 = cicloVidaRepository.findById(2L).orElse(null);
-            if (p2 != null && p2.getEstado() != EstadoPreguntaDTO.PENDIENTE_REVISION) {
-                p2.setEstado(EstadoPreguntaDTO.PENDIENTE_REVISION);
-                cicloVidaRepository.save(p2);
-                log.info("Sincronizada Pregunta #2 a estado PENDIENTE_REVISION");
-            }
         }
     }
 }

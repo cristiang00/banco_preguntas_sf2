@@ -10,14 +10,19 @@ import co.edu.unicauca.bancopreguntas.questions.client.ValidationServiceClient;
 import co.edu.unicauca.bancopreguntas.questions.domain.OpcionEntity;
 import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaBuilder;
 import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaEntity;
+import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaVersionEntity;
 import co.edu.unicauca.bancopreguntas.questions.facade.QuestionQueryFacade;
 import co.edu.unicauca.bancopreguntas.questions.repository.PreguntaRepository;
+import co.edu.unicauca.bancopreguntas.questions.repository.PreguntaVersionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class QuestionService {
@@ -26,6 +31,7 @@ public class QuestionService {
     private final ValidationServiceClient validationClient;
     private final LifecycleServiceClient lifecycleClient;
     private final QuestionQueryFacade queryFacade;
+    private final PreguntaVersionRepository preguntaVersionRepository;
 
     public static class ValidationException extends RuntimeException {
         private final List<ErrorValidacionDTO> errores;
@@ -44,10 +50,20 @@ public class QuestionService {
                            ValidationServiceClient validationClient,
                            LifecycleServiceClient lifecycleClient,
                            QuestionQueryFacade queryFacade) {
+        this(preguntaRepository, validationClient, lifecycleClient, queryFacade, null);
+    }
+
+    @Autowired
+    public QuestionService(PreguntaRepository preguntaRepository,
+                           ValidationServiceClient validationClient,
+                           LifecycleServiceClient lifecycleClient,
+                           QuestionQueryFacade queryFacade,
+                           @Autowired(required = false) PreguntaVersionRepository preguntaVersionRepository) {
         this.preguntaRepository = preguntaRepository;
         this.validationClient = validationClient;
         this.lifecycleClient = lifecycleClient;
         this.queryFacade = queryFacade;
+        this.preguntaVersionRepository = preguntaVersionRepository;
     }
 
     @Transactional
@@ -148,38 +164,55 @@ public class QuestionService {
                     + entity.getEstadoProyeccion().name() + "'. Solo está permitido desde estado 'RECHAZADA'");
         }
 
-        // Si se proveen modificaciones en el cuerpo, validar estructuralmente (HU1 / HU6.S3)
-        if (dto != null && (dto.getContexto() != null || dto.getPreguntaDirecta() != null)) {
-            dto.setId(id);
-            if (dto.getCompetencia() == null) dto.setCompetencia(entity.getCompetencia());
-            if (dto.getTema() == null) dto.setTema(entity.getTema());
-            if (dto.getSubtema() == null) dto.setSubtema(entity.getSubtema());
-            if (dto.getNivelDificultad() == null) dto.setNivelDificultad(entity.getNivelDificultad());
-            if (dto.getRespuestaCorrecta() == null) dto.setRespuestaCorrecta(entity.getRespuestaCorrecta());
-            if (dto.getBibliografia() == null) dto.setBibliografia(entity.getBibliografia());
-            if (dto.getJustificacion() == null) dto.setJustificacion(entity.getJustificacion());
+        // HU6.S3.2: Construir DTO efectivo y aplicar siempre validación estructural de la HU1
+        PreguntaDTO dtoEfectivo = new PreguntaDTO();
+        dtoEfectivo.setId(id);
+        dtoEfectivo.setContexto((dto != null && dto.getContexto() != null) ? dto.getContexto() : entity.getContexto());
+        dtoEfectivo.setPreguntaDirecta((dto != null && dto.getPreguntaDirecta() != null) ? dto.getPreguntaDirecta() : entity.getPreguntaDirecta());
+        dtoEfectivo.setRespuestaCorrecta((dto != null && dto.getRespuestaCorrecta() != null) ? dto.getRespuestaCorrecta() : entity.getRespuestaCorrecta());
+        dtoEfectivo.setJustificacion((dto != null && dto.getJustificacion() != null) ? dto.getJustificacion() : entity.getJustificacion());
+        dtoEfectivo.setBibliografia((dto != null && dto.getBibliografia() != null) ? dto.getBibliografia() : entity.getBibliografia());
+        dtoEfectivo.setCompetencia((dto != null && dto.getCompetencia() != null) ? dto.getCompetencia() : entity.getCompetencia());
+        dtoEfectivo.setTema((dto != null && dto.getTema() != null) ? dto.getTema() : entity.getTema());
+        dtoEfectivo.setSubtema((dto != null && dto.getSubtema() != null) ? dto.getSubtema() : entity.getSubtema());
+        dtoEfectivo.setNivelDificultad((dto != null && dto.getNivelDificultad() != null) ? dto.getNivelDificultad() : entity.getNivelDificultad());
+        if (dto != null && dto.getOpciones() != null && !dto.getOpciones().isEmpty()) {
+            dtoEfectivo.setOpciones(dto.getOpciones());
+        } else if (entity.getOpciones() != null) {
+            dtoEfectivo.setOpciones(entity.getOpciones().stream()
+                    .map(op -> new OpcionDTO(op.getClave(), op.getTexto()))
+                    .collect(Collectors.toList()));
+        }
 
-            ResultadoValidacionDTO valResult = validationClient.validarPregunta(dto);
-            if (!valResult.isValido()) {
-                throw new ValidationException(valResult.getErrores());
-            }
+        ResultadoValidacionDTO valResult = validationClient.validarPregunta(dtoEfectivo);
+        if (!valResult.isValido()) {
+            throw new ValidationException(valResult.getErrores());
+        }
 
-            if (dto.getContexto() != null) entity.setContexto(dto.getContexto());
-            if (dto.getPreguntaDirecta() != null) entity.setPreguntaDirecta(dto.getPreguntaDirecta());
-            if (dto.getRespuestaCorrecta() != null) entity.setRespuestaCorrecta(dto.getRespuestaCorrecta());
-            if (dto.getJustificacion() != null) entity.setJustificacion(dto.getJustificacion());
-            if (dto.getBibliografia() != null) entity.setBibliografia(dto.getBibliografia());
-            if (dto.getCompetencia() != null) entity.setCompetencia(dto.getCompetencia());
-            if (dto.getTema() != null) entity.setTema(dto.getTema());
-            if (dto.getSubtema() != null) entity.setSubtema(dto.getSubtema());
-            if (dto.getNivelDificultad() != null) entity.setNivelDificultad(dto.getNivelDificultad());
+        // Notificar a Lifecycle Service la transición Rechazada -> Borrador antes de mutar la entidad
+        lifecycleClient.crearNuevaVersion(id, userId);
 
-            if (dto.getOpciones() != null && dto.getOpciones().size() == 4) {
-                entity.getOpciones().clear();
-                int orden = 1;
-                for (OpcionDTO op : dto.getOpciones()) {
-                    entity.getOpciones().add(new OpcionEntity(op.getClave(), op.getTexto(), orden++));
-                }
+        // HU6.S3: Conservar snapshot inmutable de la versión anterior y su historial
+        if (preguntaVersionRepository != null) {
+            preguntaVersionRepository.save(PreguntaVersionEntity.fromPregunta(entity));
+        }
+
+        // Aplicar modificaciones sobre la nueva versión
+        entity.setContexto(dtoEfectivo.getContexto());
+        entity.setPreguntaDirecta(dtoEfectivo.getPreguntaDirecta());
+        entity.setRespuestaCorrecta(dtoEfectivo.getRespuestaCorrecta());
+        entity.setJustificacion(dtoEfectivo.getJustificacion());
+        entity.setBibliografia(dtoEfectivo.getBibliografia());
+        entity.setCompetencia(dtoEfectivo.getCompetencia());
+        entity.setTema(dtoEfectivo.getTema());
+        entity.setSubtema(dtoEfectivo.getSubtema());
+        entity.setNivelDificultad(dtoEfectivo.getNivelDificultad());
+
+        if (dto != null && dto.getOpciones() != null && dto.getOpciones().size() == 4) {
+            entity.getOpciones().clear();
+            int orden = 1;
+            for (OpcionDTO op : dto.getOpciones()) {
+                entity.getOpciones().add(new OpcionEntity(op.getClave(), op.getTexto(), orden++));
             }
         }
 
@@ -188,11 +221,16 @@ public class QuestionService {
         entity.setVersion(nuevaVersion);
         entity.setEstadoProyeccion(EstadoPreguntaDTO.BORRADOR);
 
-        // Notificar a Lifecycle Service la transición Rechazada -> Borrador
-        lifecycleClient.crearNuevaVersion(id, userId);
-
         PreguntaEntity versionada = preguntaRepository.save(entity);
         return queryFacade.toDTO(versionada);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PreguntaVersionEntity> listarVersionesAnteriores(Long preguntaId) {
+        if (preguntaVersionRepository == null) {
+            return Collections.emptyList();
+        }
+        return preguntaVersionRepository.findByPreguntaIdOrderByVersionAsc(preguntaId);
     }
 
     @Transactional

@@ -54,6 +54,25 @@ public class AsignarRevisoresUseCase {
             throw new IllegalStateException("Solo las preguntas en estado Pendiente de revisión pueden tener revisores asignados");
         }
 
+        // HU6: Determinar la ronda activa preservando intactas las rondas previas finalizadas en el historial
+        List<Revision> previas = repositoryPort.findByPreguntaId(preguntaId);
+        int versionPregunta = (pregunta.getVersion() != null && pregunta.getVersion() >= 1) ? pregunta.getVersion() : 1;
+        int maxRondaFinalizada = previas.stream()
+                .filter(r -> r.getEstado() != null && r.getEstado().estaFinalizada())
+                .mapToInt(Revision::getRonda)
+                .max()
+                .orElse(0);
+        int rondaActual = Math.max(versionPregunta, maxRondaFinalizada + 1);
+
+        // Validar que el total de revisores en la ronda activa no supere el máximo permitido (3)
+        java.util.Set<Long> revisoresTotalesRonda = new java.util.HashSet<>(revisorIds);
+        previas.stream()
+                .filter(r -> r.getRonda() == rondaActual)
+                .forEach(r -> revisoresTotalesRonda.add(r.getRevisorId()));
+        if (revisoresTotalesRonda.size() > PoliticaConsensoRevision.MAX_REVISORES) {
+            throw new IllegalArgumentException("Solo se permite asignar un máximo de 3 revisores por ronda de revisión");
+        }
+
         List<RevisoresAsignadosEvent.RevisorInfo> revisoresInfo = new ArrayList<>();
         List<Revision> asignacionesCreadas = new ArrayList<>();
 
@@ -69,13 +88,15 @@ public class AsignarRevisoresUseCase {
                 throw new IllegalArgumentException("El revisor " + user.getNombreUsuario() + " está inactivo");
             }
 
-            Optional<Revision> existente = repositoryPort.findByPreguntaIdAndRevisorId(preguntaId, revId);
+            Optional<Revision> existenteEnRonda = repositoryPort.findByPreguntaIdAndRevisorIdAndRonda(
+                    preguntaId, revId, rondaActual
+            );
             Revision rev;
-            if (existente.isEmpty()) {
+            if (existenteEnRonda.isEmpty()) {
                 rev = Revision.crearNueva(preguntaId, revId, user.getNombreCompleto(), user.getEmail(),
-                        pregunta.getCompetencia(), pregunta.getNivelDificultad());
+                        pregunta.getCompetencia(), pregunta.getNivelDificultad(), rondaActual);
             } else {
-                rev = existente.get();
+                rev = existenteEnRonda.get();
                 rev.reactivar();
                 rev.setCompetencia(pregunta.getCompetencia());
                 rev.setNivelDificultad(pregunta.getNivelDificultad());

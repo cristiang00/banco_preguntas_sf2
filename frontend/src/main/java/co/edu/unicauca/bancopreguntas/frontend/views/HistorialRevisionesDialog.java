@@ -31,8 +31,8 @@ public class HistorialRevisionesDialog extends JDialog {
     private JButton btnSiguiente;
     private List<Map<String, Object>> rondasActuales;
 
-    public HistorialRevisionesDialog(Frame owner, Long preguntaId) {
-        super(owner, "Historial de Revisiones — Pregunta #" + preguntaId, true);
+    public HistorialRevisionesDialog(Window owner, Long preguntaId) {
+        super(owner, "Historial de Revisiones — Pregunta #" + preguntaId, ModalityType.APPLICATION_MODAL);
         this.preguntaId = preguntaId;
         initComponents();
         cargarHistorial();
@@ -65,7 +65,7 @@ public class HistorialRevisionesDialog extends JDialog {
         add(pnlHeader, BorderLayout.NORTH);
 
         // Tabla central
-        String[] columnas = {"ID Revisión", "Revisor", "Decisión / Estado", "Fecha Asignación", "Observaciones"};
+        String[] columnas = {"ID Revisión", "Ronda", "Revisor", "Decisión / Estado", "Fecha Asignación", "Observaciones"};
         tableModel = new DefaultTableModel(columnas, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -80,7 +80,7 @@ public class HistorialRevisionesDialog extends JDialog {
         tablaHistorial.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         // Renderizador con colores de estado (HU6.S1.3)
-        tablaHistorial.getColumnModel().getColumn(2).setCellRenderer(new DefaultTableCellRenderer() {
+        tablaHistorial.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
                                                            boolean hasFocus, int row, int column) {
@@ -113,17 +113,39 @@ public class HistorialRevisionesDialog extends JDialog {
             if (!e.getValueIsAdjusting()) {
                 int row = tablaHistorial.getSelectedRow();
                 if (row >= 0 && rondasActuales != null && row < rondasActuales.size()) {
+                    Map<String, Object> ronda = rondasActuales.get(row);
+                    StringBuilder sb = new StringBuilder();
+
                     @SuppressWarnings("unchecked")
-                    List<String> obs = (List<String>) rondasActuales.get(row).get("observaciones");
-                    if (obs != null && !obs.isEmpty()) {
-                        StringBuilder sb = new StringBuilder();
-                        for (int i = 0; i < obs.size(); i++) {
-                            sb.append("• [Observación ").append(i + 1).append("]: ").append(obs.get(i)).append("\n\n");
+                    List<Map<String, Object>> evals = (List<Map<String, Object>>) ronda.get("evaluaciones");
+                    if (evals != null && !evals.isEmpty()) {
+                        sb.append("Evaluaciones registradas:\n");
+                        for (int i = 0; i < evals.size(); i++) {
+                            Map<String, Object> ev = evals.get(i);
+                            sb.append("• Criterio: ").append(ev.getOrDefault("criterio", "General"))
+                              .append(" | Calificación: ").append(ev.getOrDefault("calificacion", "N/A"));
+                            Object com = ev.get("comentario");
+                            if (com != null && !com.toString().isBlank()) {
+                                sb.append(" — ").append(com);
+                            }
+                            sb.append("\n");
                         }
-                        txtDetalleObservaciones.setText(sb.toString().trim());
-                    } else {
-                        txtDetalleObservaciones.setText("Sin observaciones registradas en esta ronda.");
+                        sb.append("\n");
                     }
+
+                    @SuppressWarnings("unchecked")
+                    List<String> obs = (List<String>) ronda.get("observaciones");
+                    if (obs != null && !obs.isEmpty()) {
+                        sb.append("Observaciones del revisor:\n");
+                        for (int i = 0; i < obs.size(); i++) {
+                            sb.append("• [Observación ").append(i + 1).append("]: ").append(obs.get(i)).append("\n");
+                        }
+                    }
+
+                    String texto = sb.toString().trim();
+                    txtDetalleObservaciones.setText(texto.isEmpty()
+                            ? "Sin evaluaciones ni observaciones registradas en esta ronda."
+                            : texto);
                 }
             }
         });
@@ -220,8 +242,10 @@ public class HistorialRevisionesDialog extends JDialog {
                                 ? obs.size() + " observación(es)"
                                 : "Sin observaciones";
 
+                        Object numRonda = r.getOrDefault("ronda", 1);
                         tableModel.addRow(new Object[]{
                                 r.get("revisionId"),
+                                "Ronda " + numRonda,
                                 r.get("revisorNombre"),
                                 r.get("estado"),
                                 r.get("fechaAsignacion"),

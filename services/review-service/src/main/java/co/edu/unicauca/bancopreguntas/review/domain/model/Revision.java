@@ -14,17 +14,26 @@ public class Revision {
     private String revisorEmail;
     private String competencia;
     private String nivelDificultad;
+    private Integer ronda;
     private EstadoRevision estado;
     private LocalDateTime fechaAsignacion;
     private LocalDateTime fechaDecision;
 
     public Revision() {
+        this.ronda = 1;
         this.estado = EstadoRevision.ASIGNADA;
         this.fechaAsignacion = LocalDateTime.now();
     }
 
     public Revision(Long id, Long preguntaId, Long revisorId, String revisorNombre, String revisorEmail,
                     String competencia, String nivelDificultad, EstadoRevision estado,
+                    LocalDateTime fechaAsignacion, LocalDateTime fechaDecision) {
+        this(id, preguntaId, revisorId, revisorNombre, revisorEmail,
+                competencia, nivelDificultad, 1, estado, fechaAsignacion, fechaDecision);
+    }
+
+    public Revision(Long id, Long preguntaId, Long revisorId, String revisorNombre, String revisorEmail,
+                    String competencia, String nivelDificultad, Integer ronda, EstadoRevision estado,
                     LocalDateTime fechaAsignacion, LocalDateTime fechaDecision) {
         this.id = id;
         this.preguntaId = preguntaId;
@@ -33,6 +42,7 @@ public class Revision {
         this.revisorEmail = revisorEmail;
         this.competencia = competencia;
         this.nivelDificultad = nivelDificultad;
+        this.ronda = (ronda != null && ronda >= 1) ? ronda : 1;
         this.estado = estado != null ? estado : EstadoRevision.ASIGNADA;
         this.fechaAsignacion = fechaAsignacion != null ? fechaAsignacion : LocalDateTime.now();
         this.fechaDecision = fechaDecision;
@@ -40,8 +50,13 @@ public class Revision {
 
     public static Revision crearNueva(Long preguntaId, Long revisorId, String revisorNombre, String revisorEmail,
                                       String competencia, String nivelDificultad) {
+        return crearNueva(preguntaId, revisorId, revisorNombre, revisorEmail, competencia, nivelDificultad, 1);
+    }
+
+    public static Revision crearNueva(Long preguntaId, Long revisorId, String revisorNombre, String revisorEmail,
+                                      String competencia, String nivelDificultad, Integer ronda) {
         return new Revision(null, preguntaId, revisorId, revisorNombre, revisorEmail,
-                competencia, nivelDificultad, EstadoRevision.ASIGNADA, LocalDateTime.now(), null);
+                competencia, nivelDificultad, ronda, EstadoRevision.ASIGNADA, LocalDateTime.now(), null);
     }
 
     public void reactivar() {
@@ -95,6 +110,8 @@ public class Revision {
     public void setCompetencia(String competencia) { this.competencia = competencia; }
     public String getNivelDificultad() { return nivelDificultad; }
     public void setNivelDificultad(String nivelDificultad) { this.nivelDificultad = nivelDificultad; }
+    public Integer getRonda() { return ronda != null ? ronda : 1; }
+    public void setRonda(Integer ronda) { this.ronda = (ronda != null && ronda >= 1) ? ronda : 1; }
     public EstadoRevision getEstado() { return estado; }
     public void setEstado(EstadoRevision estado) { this.estado = estado; }
     public LocalDateTime getFechaAsignacion() { return fechaAsignacion; }

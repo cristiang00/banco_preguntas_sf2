@@ -87,9 +87,11 @@ services:
     container_name: saberpro-users-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/users_db
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
-      JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || wget -q --spider http://localhost:8081/actuator/health || exit 1"]
       interval: 10s
@@ -98,6 +100,8 @@ services:
       start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -111,10 +115,13 @@ services:
     container_name: saberpro-questions-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/questions_db
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
       SERVICES_VALIDATION_URL: http://validation-service:8083
       SERVICES_LIFECYCLE_URL: http://lifecycle-service:8084
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
@@ -128,6 +135,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     networks:
@@ -140,9 +149,12 @@ services:
     container_name: saberpro-validation-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/validation_db
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
       SERVICES_QUESTIONS_URL: http://questions-service:8082
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8083/actuator/health || wget -q --spider http://localhost:8083/actuator/health || exit 1"]
       interval: 10s
@@ -151,6 +163,8 @@ services:
       start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     networks:
       - saberpro-network
@@ -162,14 +176,20 @@ services:
     container_name: saberpro-lifecycle-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/lifecycle_db
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      SERVICES_QUESTIONS_URL: http://questions-service:8082
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
+      SERVICES_REVIEW_URL: http://review-service:8085
       SERVICES_NOTIFICATION_URL: http://notification-service:8086
       SERVICES_AUDIT_URL: http://audit-service:8087
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RABBIT_HEALTH_ENABLED: "true"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8084/actuator/health || wget -q --spider http://localhost:8084/actuator/health || exit 1"]
       interval: 10s
@@ -178,6 +198,8 @@ services:
       start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -191,10 +213,13 @@ services:
     container_name: saberpro-review-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/review_db
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
       SERVICES_USERS_URL: http://users-service:8081
       SERVICES_QUESTIONS_URL: http://questions-service:8082
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
       SERVICES_LIFECYCLE_URL: http://lifecycle-service:8084
       SERVICES_NOTIFICATION_URL: http://notification-service:8086
       SERVICES_AUDIT_URL: http://audit-service:8087
@@ -202,6 +227,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RABBIT_HEALTH_ENABLED: "true"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8085/actuator/health || wget -q --spider http://localhost:8085/actuator/health || exit 1"]
       interval: 10s
@@ -210,6 +236,8 @@ services:
       start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -223,6 +251,8 @@ services:
     container_name: saberpro-notification-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
       NOTIFICATION_EMAIL_PROVIDER: ${NOTIFICATION_EMAIL_PROVIDER:-smtp}
@@ -235,6 +265,8 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RABBIT_HEALTH_ENABLED: "true"
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8086/actuator/health || wget -q --spider http://localhost:8086/actuator/health || exit 1"]
       interval: 10s
@@ -244,8 +276,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     networks:
       - saberpro-network
 
@@ -256,12 +292,16 @@ services:
     container_name: saberpro-audit-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/audit_db
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RABBIT_HEALTH_ENABLED: "true"
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8087/actuator/health || wget -q --spider http://localhost:8087/actuator/health || exit 1"]
       interval: 10s
@@ -270,6 +310,8 @@ services:
       start_period: 25s
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -285,7 +327,6 @@ services:
       dockerfile: api-gateway/Dockerfile
     container_name: saberpro-api-gateway
     environment:
-      JWT_SECRET: ${JWT_SECRET:-SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
       KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/saberpro/protocol/openid-connect/certs
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8089/realms/saberpro}
       USERS_SERVICE_URL: http://users-service:8081

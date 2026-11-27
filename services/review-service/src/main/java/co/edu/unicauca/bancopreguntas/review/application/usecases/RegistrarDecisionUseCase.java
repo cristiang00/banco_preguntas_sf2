@@ -48,6 +48,7 @@ public class RegistrarDecisionUseCase {
 
         String decision = req.getDecision() != null ? req.getDecision().trim().toUpperCase() : "";
         Long preguntaId = rev.getPreguntaId();
+        int rondaActual = rev.getRonda();
 
         PreguntaDTO pregunta = preguntasClientPort.obtenerPregunta(preguntaId)
                 .orElseThrow(() -> new IllegalArgumentException("Pregunta no encontrada"));
@@ -73,26 +74,35 @@ public class RegistrarDecisionUseCase {
             rev.rechazar();
             repositoryPort.save(rev);
 
-            // Política de rechazo: Si un revisor rechaza, cerrar demás revisiones
-            List<Revision> todas = repositoryPort.findByPreguntaId(preguntaId);
-            for (Revision otra : todas) {
+            // Política de rechazo: Si un revisor rechaza, cerrar demás revisiones pendientes de la ronda actual
+            List<Revision> revisionesRonda = politicaConsenso.filtrarRevisionesDeRonda(
+                    repositoryPort.findByPreguntaId(preguntaId), rondaActual
+            );
+            for (Revision otra : revisionesRonda) {
                 if (!otra.getId().equals(revisionId) && !otra.getEstado().estaFinalizada()) {
                     otra.cerrarPorRechazo();
                     repositoryPort.save(otra);
                 }
             }
 
-            List<String> todasObs = repositoryPort.findObservacionesByPreguntaId(preguntaId)
-                    .stream().filter(Observacion::isVisibleAutor).map(Observacion::getTexto).collect(Collectors.toList());
+            List<String> obsRonda = revisionesRonda.stream()
+                    .flatMap(r -> repositoryPort.findObservacionesByRevisionId(r.getId()).stream())
+                    .filter(Observacion::isVisibleAutor)
+                    .map(Observacion::getTexto)
+                    .collect(Collectors.toList());
+            if (obsRonda.isEmpty()) {
+                obsRonda = repositoryPort.findObservacionesByPreguntaId(preguntaId)
+                        .stream().filter(Observacion::isVisibleAutor).map(Observacion::getTexto).collect(Collectors.toList());
+            }
 
             lifecycleClientPort.aplicarDecision(preguntaId, "RECHAZADA", revisorId, autorEmail,
-                    pregunta.getContexto(), todasObs, correlationId);
+                    pregunta.getContexto(), obsRonda, correlationId);
 
             preguntasClientPort.actualizarProyeccionEstado(preguntaId, "RECHAZADA");
 
             PreguntaRechazadaEvent rechazoEvent = new PreguntaRechazadaEvent(
                     preguntaId, pregunta.getAutorId(), pregunta.getAutorNombre(), autorEmail,
-                    pregunta.getContexto(), todasObs, correlationId
+                    pregunta.getContexto(), obsRonda, correlationId
             );
             eventPublisherPort.publish(rechazoEvent);
 
@@ -101,7 +111,7 @@ public class RegistrarDecisionUseCase {
             repositoryPort.save(rev);
 
             List<Revision> todas = repositoryPort.findByPreguntaId(preguntaId);
-            boolean todosAprobaron = politicaConsenso.determinarConsensoAprobacion(todas);
+            boolean todosAprobaron = politicaConsenso.determinarConsensoAprobacionRonda(todas, rondaActual);
 
             if (todosAprobaron) {
                 lifecycleClientPort.aplicarDecision(preguntaId, "APROBADA", revisorId, autorEmail,

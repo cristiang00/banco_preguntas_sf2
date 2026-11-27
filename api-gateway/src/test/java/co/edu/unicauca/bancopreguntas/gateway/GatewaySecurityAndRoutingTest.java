@@ -3,316 +3,320 @@ package co.edu.unicauca.bancopreguntas.gateway;
 import co.edu.unicauca.bancopreguntas.gateway.config.GatewayProperties;
 import co.edu.unicauca.bancopreguntas.gateway.filter.CorrelationFilter;
 import co.edu.unicauca.bancopreguntas.gateway.proxy.GatewayRoutingController;
-import co.edu.unicauca.bancopreguntas.gateway.security.JwtValidator;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import co.edu.unicauca.bancopreguntas.gateway.security.GatewaySecurityConfig;
+import co.edu.unicauca.bancopreguntas.gateway.security.KeycloakJwtExtractor;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.*;
-import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.RestTemplate;
 
-import javax.crypto.SecretKey;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+/**
+ * Pruebas automatizadas del API Gateway con Spring Security OAuth2 Resource Server (HU7.S3.4, HU7.S4.4, HU7.S5.2).
+ * Valida tokens RS256 válidos, expirados y firmados con otra clave, matriz de roles 403 y anti-suplantación X-User-*.
+ */
+@WebMvcTest(useDefaultFilters = false)
+@Import({
+        GatewaySecurityConfig.class,
+        KeycloakJwtExtractor.class,
+        GatewayProperties.class,
+        CorrelationFilter.class,
+        GatewaySecurityAndRoutingTest.TestGatewayBeansConfig.class
+})
 class GatewaySecurityAndRoutingTest {
 
-    private static final String SECRET = "SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256";
-    private final SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    private static KeyPair validRsaKeyPair;
+    private static KeyPair otherRsaKeyPair;
+    private static final AtomicReference<HttpHeaders> forwardedHeaders = new AtomicReference<>();
 
-    private GatewayProperties properties;
-    private JwtValidator jwtValidator;
-    private GatewayRoutingController controller;
-    private KeyPair rsaKeyPair;
-    private AtomicReference<HttpHeaders> forwardedHeaders;
-
-    private String createTestToken(Long userId, String username, String role) {
-        return Jwts.builder()
-                .claims(Map.of("userId", userId, "username", username, "role", role))
-                .subject(username)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 3600000))
-                .signWith(key)
-                .compact();
-    }
-
-    private String createRsaKeycloakToken(String username, String role, boolean expired) {
-        long now = System.currentTimeMillis();
-        long exp = expired ? now - 3600000 : now + 3600000;
-
-        Map<String, Object> realmAccess = Map.of("roles", List.of(role, "default-roles-saberpro"));
-
-        return Jwts.builder()
-                .header().keyId("keycloak-key-1").and()
-                .subject(username)
-                .claim("preferred_username", username)
-                .claim("realm_access", realmAccess)
-                .issuedAt(new Date(now))
-                .expiration(new Date(exp))
-                .signWith(rsaKeyPair.getPrivate(), Jwts.SIG.RS256)
-                .compact();
-    }
-
-    @BeforeEach
-    void setUp() throws Exception {
-        properties = new GatewayProperties();
-        jwtValidator = new JwtValidator(SECRET);
-
+    @BeforeAll
+    static void initKeys() throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
         kpg.initialize(2048);
-        rsaKeyPair = kpg.generateKeyPair();
-        jwtValidator.setRsaPublicKey(rsaKeyPair.getPublic());
+        validRsaKeyPair = kpg.generateKeyPair();
+        otherRsaKeyPair = kpg.generateKeyPair();
+    }
 
-        forwardedHeaders = new AtomicReference<>();
+    @TestConfiguration
+    static class TestGatewayBeansConfig {
+        @Bean
+        @Primary
+        JwtDecoder testJwtDecoder() {
+            return NimbusJwtDecoder.withPublicKey((RSAPublicKey) validRsaKeyPair.getPublic()).build();
+        }
 
-        // Stub RestTemplate que simula respuestas de los microservicios y captura cabeceras
-        RestTemplate stubRestTemplate = new RestTemplate() {
-            @Override
-            public <T> ResponseEntity<T> exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity,
-                    Class<T> responseType) {
-                forwardedHeaders.set(requestEntity.getHeaders());
-                HttpHeaders headers = new HttpHeaders();
-                headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.set(CorrelationFilter.CORRELATION_HEADER,
-                        requestEntity.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
-                byte[] body = "{\"status\":\"ok\",\"mocked\":true}".getBytes(StandardCharsets.UTF_8);
-                return (ResponseEntity<T>) new ResponseEntity<>(body, headers, HttpStatus.OK);
-            }
-        };
+        @Bean
+        @Primary
+        GatewayRoutingController testGatewayRoutingController(GatewayProperties props, KeycloakJwtExtractor extractor) {
+            RestTemplate stubRestTemplate = new RestTemplate() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public <T> ResponseEntity<T> exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity,
+                                                      Class<T> responseType) {
+                    forwardedHeaders.set(requestEntity.getHeaders());
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_JSON);
+                    String corr = requestEntity.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER);
+                    if (corr != null) {
+                        headers.set(CorrelationFilter.CORRELATION_HEADER, corr);
+                    }
+                    byte[] body = "{\"status\":\"ok\",\"mocked\":true}".getBytes(StandardCharsets.UTF_8);
+                    return (ResponseEntity<T>) new ResponseEntity<>(body, headers, HttpStatus.OK);
+                }
+            };
+            return new GatewayRoutingController(props, extractor, stubRestTemplate);
+        }
+    }
 
-        controller = new GatewayRoutingController(properties, jwtValidator, stubRestTemplate);
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private GatewayRoutingController controller;
+
+    @Autowired
+    private GatewayProperties properties;
+
+    @BeforeEach
+    void resetCapturedHeaders() {
+        forwardedHeaders.set(null);
+    }
+
+    private String createKeycloakRs256Token(String username, String role, boolean expired, KeyPair signingKeyPair) throws Exception {
+        long now = System.currentTimeMillis();
+        Date exp = new Date(expired ? now - 3600_000L : now + 3600_000L);
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject(username)
+                .claim("preferred_username", username)
+                .claim("realm_access", Map.of("roles", List.of(role, "default-roles-saberpro")))
+                .issueTime(new Date(now - 60_000L))
+                .expirationTime(exp)
+                .build();
+
+        SignedJWT signedJWT = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("kc-key-1").build(),
+                claims
+        );
+        signedJWT.sign(new RSASSASigner(signingKeyPair.getPrivate()));
+        return signedJWT.serialize();
     }
 
     @Test
-    @DisplayName("Público: /api/v1/auth/login debe permitir acceso sin token")
-    void testPublicEndpointAuthLogin() {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-test-1");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.POST, request, "{}".getBytes());
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
+    @DisplayName("Público: GET /api/v1/catalogos/competencias debe permitir acceso sin token")
+    void testPublicCatalogosEndpoint() throws Exception {
+        mockMvc.perform(get("/api/v1/catalogos/competencias"))
+                .andExpect(status().isOk())
+                .andExpect(header().exists(CorrelationFilter.CORRELATION_HEADER));
     }
 
     @Test
-    @DisplayName("CORS Preflight: Solicitudes OPTIONS deben permitirse sin token de autorización")
-    void testOptionsMethodIsPublic() {
-        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/v1/preguntas");
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-cors-1");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.OPTIONS, request, null);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
+    @DisplayName("CORS Preflight: Solicitudes OPTIONS deben permitirse sin token")
+    void testOptionsMethodIsPublic() throws Exception {
+        mockMvc.perform(options("/api/v1/preguntas"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("Seguridad: endpoints protegidos sin token deben responder 401 Unauthorized")
-    void testProtectedWithoutToken() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas");
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-test-2");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    @DisplayName("HU7.S3: Endpoint protegido sin token responde 401 Unauthorized")
+    void testProtectedWithoutToken() throws Exception {
+        mockMvc.perform(get("/api/v1/preguntas"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("Seguridad: token inválido o corrupto debe responder 401 Unauthorized")
-    void testProtectedWithInvalidToken() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas");
-        request.addHeader("Authorization", "Bearer tokenInvalido12345");
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-test-3");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    @DisplayName("HU7.S3: Token malformado o corrupto responde 401 Unauthorized")
+    void testProtectedWithInvalidToken() throws Exception {
+        mockMvc.perform(get("/api/v1/preguntas")
+                        .header("Authorization", "Bearer tokenInvalido12345"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("Enrutamiento HU2: /preguntas/{id}/enviar-revision debe enrutar a lifecycle-service")
-    void testRouteEnviarARevisionDirectsToLifecycle() {
-        String target = controller.resolveTargetService("/preguntas/42/enviar-revision");
-        assertEquals(properties.getLifecycle(), target,
-                "El endpoint enviar-revision debe ser dirigido a lifecycle-service");
+    @DisplayName("HU7.S3.4: Token Keycloak RS256 expirado responde 401 Unauthorized")
+    void testKeycloakRsaTokenExpirado_responde401() throws Exception {
+        String expiredToken = createKeycloakRs256Token("autor1", "AUTOR", true, validRsaKeyPair);
+
+        mockMvc.perform(get("/api/v1/preguntas/1")
+                        .header("Authorization", "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("Control de Roles: Autor intentando asignar revisores responde 403 Forbidden")
-    void testRoleForbiddenAutorAssigningReviewers() {
-        String tokenAutor = createTestToken(2L, "juan_autor", "AUTOR");
+    @DisplayName("HU7.S3.4: Token Keycloak RS256 firmado con otra clave RSA responde 401 Unauthorized")
+    void testKeycloakRsaTokenOtraClave_responde401() throws Exception {
+        String wrongKeyToken = createKeycloakRs256Token("autor1", "AUTOR", false, otherRsaKeyPair);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/revisiones/asignar");
-        request.addHeader("Authorization", "Bearer " + tokenAutor);
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-test-4");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.POST, request, "{}".getBytes());
-
-        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/preguntas/1")
+                        .header("Authorization", "Bearer " + wrongKeyToken))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("Control de Roles: Administrador asignando revisores responde 200 OK y propaga correlación")
-    void testRoleAllowedAdminAssigningReviewers() {
-        String tokenAdmin = createTestToken(1L, "admin_user", "ADMINISTRADOR");
+    @DisplayName("HU7.S3.4: Token Keycloak RS256 con payload alterado responde 401 Unauthorized")
+    void testKeycloakRsaTokenFirmaAlterada_responde401() throws Exception {
+        String token = createKeycloakRs256Token("autor1", "AUTOR", false, validRsaKeyPair);
+        String[] parts = token.split("\\.");
+        String alteredToken = parts[0] + "." + parts[1] + "X." + parts[2];
 
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/revisiones/asignar");
-        request.addHeader("Authorization", "Bearer " + tokenAdmin);
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-admin-99");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.POST, request, "{}".getBytes());
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("corr-admin-99", response.getHeaders().getFirst(CorrelationFilter.CORRELATION_HEADER));
+        mockMvc.perform(get("/api/v1/preguntas/1")
+                        .header("Authorization", "Bearer " + alteredToken))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("Control de Roles: Revisor consultando revisiones asignadas responde 200 OK")
-    void testRoleAllowedRevisor() {
-        String tokenRevisor = createTestToken(4L, "revisor_user", "REVISOR");
+    @DisplayName("HU7.S3.2: Token Keycloak RS256 válido propaga identidad, rol y Bearer al microservicio")
+    void testKeycloakRsaTokenValido_propagaHeaders() throws Exception {
+        String token = createKeycloakRs256Token("autor1", "AUTOR", false, validRsaKeyPair);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/revisiones/asignadas");
-        request.addHeader("Authorization", "Bearer " + tokenRevisor);
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-rev-1");
+        mockMvc.perform(get("/api/v1/preguntas/1")
+                        .header("Authorization", "Bearer " + token)
+                        .header(CorrelationFilter.CORRELATION_HEADER, "corr-rsa-1"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(CorrelationFilter.CORRELATION_HEADER, "corr-rsa-1"));
 
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-    }
-
-    @Test
-    @DisplayName("Control de Roles: Autor intentando consultar /preguntas/pendientes responde 403 Forbidden")
-    void testRoleForbiddenAutorConsultingPendientes() {
-        String tokenAutor = createTestToken(2L, "juan_autor", "AUTOR");
-
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/pendientes");
-        request.addHeader("Authorization", "Bearer " + tokenAutor);
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-pend-1");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-    }
-
-    @Test
-    @DisplayName("Control de Roles: Autor intentando crear usuario (POST /usuarios) responde 403 Forbidden")
-    void testRoleForbiddenAutorCreatingUser() {
-        String tokenAutor = createTestToken(2L, "juan_autor", "AUTOR");
-
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/usuarios");
-        request.addHeader("Authorization", "Bearer " + tokenAutor);
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-usr-1");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.POST, request, "{}".getBytes());
-
-        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-    }
-
-    // =========================================================================
-    // HU7: Pruebas con Tokens Keycloak RS256 (HU7.S3.4, HU7.S4.4, HU7.S5.2)
-    // =========================================================================
-
-    @Test
-    @DisplayName("HU7.S3: Token Keycloak RS256 válido es validado y propaga cabeceras X-User-*")
-    void testKeycloakRsaTokenValido_propagaHeaders() {
-        String token = createRsaKeycloakToken("autor1", "AUTOR", false);
-
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
-        request.addHeader("Authorization", "Bearer " + token);
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-rsa-1");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(forwardedHeaders.get());
         assertEquals("AUTOR", forwardedHeaders.get().getFirst("X-User-Role"));
         assertEquals("autor1", forwardedHeaders.get().getFirst("X-User-Name"));
         assertEquals("2", forwardedHeaders.get().getFirst("X-User-Id"));
+        assertEquals("Bearer " + token, forwardedHeaders.get().getFirst(HttpHeaders.AUTHORIZATION));
     }
 
     @Test
-    @DisplayName("HU7.S3: Token Keycloak RS256 expirado responde 401 Unauthorized")
-    void testKeycloakRsaTokenExpirado_responde401() {
-        String token = createRsaKeycloakToken("autor1", "AUTOR", true);
+    @DisplayName("HU7.S5.2: Cabeceras X-User-* inyectadas por el cliente son ignoradas y sobrescritas con el JWT")
+    void testSpoofedHeadersAreIgnoredAndOverwritten() throws Exception {
+        String token = createKeycloakRs256Token("autor1", "AUTOR", false, validRsaKeyPair);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
-        request.addHeader("Authorization", "Bearer " + token);
-        request.setAttribute(CorrelationFilter.CORRELATION_HEADER, "corr-rsa-exp");
+        mockMvc.perform(get("/api/v1/preguntas/1")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-User-Id", "999")
+                        .header("X-User-Role", "ADMINISTRADOR"))
+                .andExpect(status().isOk());
 
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-    }
-
-    @Test
-    @DisplayName("HU7.S3: Token Keycloak RS256 con firma alterada responde 401 Unauthorized")
-    void testKeycloakRsaTokenFirmaAlterada_responde401() {
-        String token = createRsaKeycloakToken("autor1", "AUTOR", false);
-        // Alterar el payload del token
-        String[] parts = token.split("\\.");
-        String alteredToken = parts[0] + "." + parts[1] + "X." + parts[2];
-
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
-        request.addHeader("Authorization", "Bearer " + alteredToken);
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-    }
-
-    @Test
-    @DisplayName("HU7.S4: Revisor intentando consultar historial de pregunta responde 403 Forbidden")
-    void testRoleForbiddenRevisorAccessingHistorial() {
-        String tokenRevisor = createRsaKeycloakToken("revisor1", "REVISOR", false);
-
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/revisiones/pregunta/10/historial");
-        request.addHeader("Authorization", "Bearer " + tokenRevisor);
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-    }
-
-    @Test
-    @DisplayName("HU7.S4: Autor consultando su historial responde 200 OK")
-    void testRoleAllowedAutorAccessingHistorial() {
-        String tokenAutor = createRsaKeycloakToken("autor1", "AUTOR", false);
-
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/revisiones/pregunta/10/historial");
-        request.addHeader("Authorization", "Bearer " + tokenAutor);
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-    }
-
-    @Test
-    @DisplayName("HU7.S5.2: Intento de suplantación de identidad en cabeceras X-User-Id es ignorado y sobrescrito con el token")
-    void testSpoofedHeadersAreIgnoredAndOverwritten() {
-        String token = createRsaKeycloakToken("autor1", "AUTOR", false);
-
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/preguntas/1");
-        request.addHeader("Authorization", "Bearer " + token);
-        // Cliente intenta inyectar rol de administrador y otro ID
-        request.addHeader("X-User-Id", "999");
-        request.addHeader("X-User-Role", "ADMINISTRADOR");
-
-        ResponseEntity<?> response = controller.routeRequest(HttpMethod.GET, request, null);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(forwardedHeaders.get());
-        assertEquals("2", forwardedHeaders.get().getFirst("X-User-Id"), "El ID debe ser el del token autenticado (2), no el inyectado (999)");
-        assertEquals("AUTOR", forwardedHeaders.get().getFirst("X-User-Role"), "El rol debe ser el del token (AUTOR), no el inyectado (ADMINISTRADOR)");
+        assertEquals("2", forwardedHeaders.get().getFirst("X-User-Id"));
+        assertEquals("AUTOR", forwardedHeaders.get().getFirst("X-User-Role"));
+    }
+
+    @Test
+    @DisplayName("HU2 Enrutamiento: /preguntas/{id}/enviar-revision enruta a lifecycle-service")
+    void testRouteEnviarARevisionDirectsToLifecycle() {
+        assertEquals(properties.getLifecycle(), controller.resolveTargetService("/preguntas/42/enviar-revision"));
+    }
+
+    @Test
+    @DisplayName("HU7.S4.4 - AUTOR: permitido en crear/listar/historial y 403 en asignar/pendientes/usuarios/auditoría/asignadas")
+    void testAutorRoleMatrix() throws Exception {
+        String tokenAutor = createKeycloakRs256Token("autor1", "AUTOR", false, validRsaKeyPair);
+
+        mockMvc.perform(post("/api/v1/preguntas").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenAutor))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/revisiones/pregunta/10/historial")
+                        .header("Authorization", "Bearer " + tokenAutor))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/revisiones/asignar").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenAutor))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/preguntas/pendientes")
+                        .header("Authorization", "Bearer " + tokenAutor))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/usuarios").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenAutor))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/auditoria")
+                        .header("Authorization", "Bearer " + tokenAutor))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/revisiones/asignadas")
+                        .header("Authorization", "Bearer " + tokenAutor))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("HU7.S4.4 - REVISOR: permitido en asignadas/evaluacion/decision y 403 en asignar/historial/crear pregunta")
+    void testRevisorRoleMatrix() throws Exception {
+        String tokenRevisor = createKeycloakRs256Token("revisor1", "REVISOR", false, validRsaKeyPair);
+
+        mockMvc.perform(get("/api/v1/revisiones/asignadas")
+                        .header("Authorization", "Bearer " + tokenRevisor))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/revisiones/5/evaluacion").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenRevisor))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/revisiones/5/decision").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenRevisor))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/revisiones/asignar").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenRevisor))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/revisiones/pregunta/10/historial")
+                        .header("Authorization", "Bearer " + tokenRevisor))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/preguntas").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenRevisor))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("HU7.S4.4 - ADMINISTRADOR: permitido en asignar/pendientes/auditoría/usuarios y 403 en decidir revisión")
+    void testAdminRoleMatrix() throws Exception {
+        String tokenAdmin = createKeycloakRs256Token("admin", "ADMINISTRADOR", false, validRsaKeyPair);
+
+        mockMvc.perform(post("/api/v1/revisiones/asignar").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenAdmin)
+                        .header(CorrelationFilter.CORRELATION_HEADER, "corr-admin-99"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(CorrelationFilter.CORRELATION_HEADER, "corr-admin-99"));
+        mockMvc.perform(get("/api/v1/revisiones/pendientes")
+                        .header("Authorization", "Bearer " + tokenAdmin))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/auditoria")
+                        .header("Authorization", "Bearer " + tokenAdmin))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/usuarios").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenAdmin))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/revisiones/5/decision").contentType(MediaType.APPLICATION_JSON).content("{}")
+                        .header("Authorization", "Bearer " + tokenAdmin))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("HU7.S2.3: Endpoint legacy /api/v1/auth/login ya no es público ni enrutado")
+    void testLegacyAuthLoginRemoved() throws Exception {
+        assertNull(controller.resolveTargetService("/auth/login"));
+        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
     }
 }

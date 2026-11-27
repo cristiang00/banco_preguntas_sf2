@@ -1,9 +1,9 @@
 package co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa;
 
 import co.edu.unicauca.bancopreguntas.review.application.ports.output.RevisionRepositoryPort;
-import co.edu.unicauca.bancopreguntas.review.domain.EvaluacionRevisorEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.ObservacionEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.RevisionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EvaluacionRevisorEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.ObservacionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.RevisionEntity;
 import co.edu.unicauca.bancopreguntas.review.domain.model.EstadoRevision;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Evaluacion;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Observacion;
@@ -65,12 +65,19 @@ public class JpaRevisionRepositoryAdapter implements RevisionRepositoryPort {
     }
 
     @Override
+    public Optional<Revision> findByPreguntaIdAndRevisorIdAndRonda(Long preguntaId, Long revisorId, Integer ronda) {
+        int rTarget = (ronda != null && ronda >= 1) ? ronda : 1;
+        return revisionRepository.findByPreguntaIdAndRevisorIdAndRonda(preguntaId, revisorId, rTarget)
+                .map(ReviewDomainMapper::toDomain);
+    }
+
+    @Override
     public Map<String, Object> findByRevisorIdWithFilters(Long revisorId, EstadoRevision estado,
                                                           String competencia, String dificultad,
                                                           int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size));
-        co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision jpaEstado = estado != null
-                ? co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision.valueOf(estado.name())
+        co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision jpaEstado = estado != null
+                ? co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision.valueOf(estado.name())
                 : null;
 
         Page<RevisionEntity> revPage = revisionRepository.findByRevisorIdWithFilters(
@@ -113,6 +120,13 @@ public class JpaRevisionRepositoryAdapter implements RevisionRepositoryPort {
     @Override
     public List<Observacion> findObservacionesByPreguntaId(Long preguntaId) {
         return observacionRepository.findByPreguntaIdAndVisibleAutorTrue(preguntaId).stream()
+                .map(ReviewDomainMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Evaluacion> findEvaluacionesByRevisionId(Long revisionId) {
+        return evaluacionRepository.findByRevisionId(revisionId).stream()
                 .map(ReviewDomainMapper::toDomain)
                 .collect(Collectors.toList());
     }

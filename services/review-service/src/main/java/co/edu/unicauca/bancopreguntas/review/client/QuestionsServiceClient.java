@@ -1,6 +1,7 @@
 package co.edu.unicauca.bancopreguntas.review.client;
 
 import co.edu.unicauca.bancopreguntas.contracts.dto.PreguntaDTO;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.security.ResourceServerSecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class QuestionsServiceClient {
         factory.setConnectTimeout(2000);
         factory.setReadTimeout(3000);
         this.restTemplate = new RestTemplate(factory);
+        this.restTemplate.getInterceptors().add(ResourceServerSecurityConfig.bearerForwardingInterceptor());
         this.questionsServiceUrl = questionsServiceUrl;
     }
 
@@ -43,17 +45,15 @@ public class QuestionsServiceClient {
 
     public Optional<PreguntaDTO> obtenerPregunta(Long id) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-User-Role", "ADMINISTRADOR");
-            HttpEntity<?> entity = new HttpEntity<>(headers);
-
             ResponseEntity<PreguntaDTO> resp = restTemplate.exchange(
                     questionsServiceUrl + "/preguntas/" + id,
                     HttpMethod.GET,
-                    entity,
+                    null,
                     PreguntaDTO.class
             );
             return Optional.ofNullable(resp.getBody());
+        } catch (org.springframework.web.client.HttpClientErrorException.Forbidden e) {
+            throw new SecurityException("Acceso denegado: solo el autor de la pregunta puede consultar su historial de revisiones");
         } catch (Exception e) {
             log.warn("No se pudo obtener pregunta {} de Questions Service: {}", id, e.getMessage());
             return Optional.empty();

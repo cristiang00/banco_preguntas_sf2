@@ -1,10 +1,9 @@
 package co.edu.unicauca.bancopreguntas.lifecycle.service;
 
 import co.edu.unicauca.bancopreguntas.contracts.dto.EstadoPreguntaDTO;
-import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaAprobadaEvent;
 import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaEnviadaARevisionEvent;
-import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaRechazadaEvent;
 import co.edu.unicauca.bancopreguntas.lifecycle.client.QuestionsServiceClient;
+import co.edu.unicauca.bancopreguntas.lifecycle.client.ReviewServiceClient;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.HistorialTransicionEntity;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.PreguntaCicloVidaEntity;
 import co.edu.unicauca.bancopreguntas.lifecycle.domain.state.AccesoDenegadoException;
@@ -19,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -28,22 +28,32 @@ public class LifecycleService {
     private final HistorialTransicionRepository historialRepository;
     private final LifecycleEventPublisher eventPublisher;
     private final QuestionsServiceClient questionsClient;
+    private final ReviewServiceClient reviewClient;
 
     public LifecycleService(PreguntaCicloVidaRepository cicloVidaRepository,
                             HistorialTransicionRepository historialRepository,
                             LifecycleEventPublisher eventPublisher) {
-        this(cicloVidaRepository, historialRepository, eventPublisher, null);
+        this(cicloVidaRepository, historialRepository, eventPublisher, null, null);
+    }
+
+    public LifecycleService(PreguntaCicloVidaRepository cicloVidaRepository,
+                            HistorialTransicionRepository historialRepository,
+                            LifecycleEventPublisher eventPublisher,
+                            QuestionsServiceClient questionsClient) {
+        this(cicloVidaRepository, historialRepository, eventPublisher, questionsClient, null);
     }
 
     @Autowired
     public LifecycleService(PreguntaCicloVidaRepository cicloVidaRepository,
                             HistorialTransicionRepository historialRepository,
                             LifecycleEventPublisher eventPublisher,
-                            @Autowired(required = false) QuestionsServiceClient questionsClient) {
+                            @Autowired(required = false) QuestionsServiceClient questionsClient,
+                            @Autowired(required = false) ReviewServiceClient reviewClient) {
         this.cicloVidaRepository = cicloVidaRepository;
         this.historialRepository = historialRepository;
         this.eventPublisher = eventPublisher;
         this.questionsClient = questionsClient;
+        this.reviewClient = reviewClient;
     }
 
     @Transactional
@@ -72,7 +82,16 @@ public class LifecycleService {
     public EstadoPreguntaDTO enviarARevision(Long preguntaId, Long usuarioAutenticadoId, String autorNombre,
                                              String contexto, String preguntaDirecta, String correlationId) {
         PreguntaCicloVidaEntity entity = cicloVidaRepository.findById(preguntaId)
-                .orElseGet(() -> registrarPreguntaInicial(preguntaId, usuarioAutenticadoId));
+                .orElseGet(() -> {
+                    Long autorReal = usuarioAutenticadoId;
+                    if (questionsClient != null) {
+                        Long consultado = questionsClient.obtenerAutorIdReal(preguntaId);
+                        if (consultado != null) {
+                            autorReal = consultado;
+                        }
+                    }
+                    return registrarPreguntaInicial(preguntaId, autorReal);
+                });
 
         // SSCRUM-45: Validar autoría
         if (entity.getAutorId() != null && !entity.getAutorId().equals(usuarioAutenticadoId)) {
@@ -106,7 +125,13 @@ public class LifecycleService {
             } catch (Exception ignored) {}
         }
 
-        // SSCRUM-42 / HU6.S5: Publicación del evento en el broker con versión
+        // HU6.S5.2: Consultar revisores de rondas anteriores si es una nueva versión
+        List<String> revisoresAnteriores = Collections.emptyList();
+        if (version > 1 && reviewClient != null) {
+            revisoresAnteriores = reviewClient.obtenerEmailsRevisoresAnteriores(preguntaId);
+        }
+
+        // SSCRUM-42 / HU6.S5: Publicación del evento en el broker con versión y revisores previos
         PreguntaEnviadaARevisionEvent event = new PreguntaEnviadaARevisionEvent(
                 preguntaId,
                 entity.getAutorId(),
@@ -114,6 +139,7 @@ public class LifecycleService {
                 contexto,
                 preguntaDirecta,
                 version,
+                revisoresAnteriores,
                 correlationId
         );
         eventPublisher.publish(event);
@@ -178,21 +204,12 @@ public class LifecycleService {
             historialRepository.save(new HistorialTransicionEntity(
                     preguntaId, estadoAnterior, entity.getEstado(), usuarioId, "Aprobada por consenso de revisores"
             ));
-
-            eventPublisher.publish(new PreguntaAprobadaEvent(
-                    preguntaId, entity.getAutorId(), "Autor", autorEmail, contexto, "Aprobada", correlationId
-            ));
-
         } else if ("RECHAZADA".equalsIgnoreCase(decision) || "RECHAZAR".equalsIgnoreCase(decision)) {
             String motivo = (observaciones != null && !observaciones.isEmpty()) ? String.join("; ", observaciones) : "Rechazada por revisor";
             estadoActual.reject(entity, motivo);
             cicloVidaRepository.save(entity);
             historialRepository.save(new HistorialTransicionEntity(
                     preguntaId, estadoAnterior, entity.getEstado(), usuarioId, motivo
-            ));
-
-            eventPublisher.publish(new PreguntaRechazadaEvent(
-                    preguntaId, entity.getAutorId(), "Autor", autorEmail, contexto, observaciones, correlationId
             ));
         } else {
             throw new IllegalArgumentException("Decisión inválida: " + decision);

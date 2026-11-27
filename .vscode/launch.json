@@ -3,6 +3,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "FrontendMain",
+            "request": "launch",
+            "mainClass": "co.edu.unicauca.bancopreguntas.frontend.FrontendMain",
+            "projectName": "frontend"
+        },
+        {
+            "type": "java",
             "name": "Main",
             "request": "launch",
             "mainClass": "co.edu.unicauca.bancopreguntas.Main",

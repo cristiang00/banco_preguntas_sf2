@@ -47,12 +47,12 @@ public class LoginFrame extends JFrame {
 
         JLabel lblUser = new JLabel("Nombre de Usuario:");
         lblUser.setFont(UIUtils.FONT_SUBTITLE);
-        txtUsername = new JTextField("juan12"); // Usuario autor por defecto para facilitar pruebas
+        txtUsername = new JTextField("autor1"); // Usuario autor por defecto alineado con Keycloak
         UIUtils.stylizeTextField(txtUsername);
 
         JLabel lblPass = new JLabel("Contraseña:");
         lblPass.setFont(UIUtils.FONT_SUBTITLE);
-        txtPassword = new JPasswordField("Password123!@");
+        txtPassword = new JPasswordField("Autor1234!");
         UIUtils.stylizeTextField(txtPassword);
 
         lblError = new JLabel("", SwingConstants.CENTER);
@@ -75,7 +75,7 @@ public class LoginFrame extends JFrame {
         UIUtils.stylizePrimaryButton(btnLogin);
         btnLogin.addActionListener(e -> ejecutarLogin());
 
-        JLabel lblInfo = new JLabel("Conectando a API Gateway (http://localhost:8080)", SwingConstants.CENTER);
+        JLabel lblInfo = new JLabel("Autenticación Keycloak OIDC → API Gateway", SwingConstants.CENTER);
         lblInfo.setFont(UIUtils.FONT_SMALL);
         lblInfo.setForeground(UIUtils.COLOR_TEXT_MUTED);
 

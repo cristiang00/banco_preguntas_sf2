@@ -44,7 +44,16 @@ public class DetallePreguntaDialog extends JDialog {
         JLabel lblEstado = new JLabel(" " + pregunta.getEstado() + " ");
         lblEstado.setFont(UIUtils.FONT_SUBTITLE);
         lblEstado.setOpaque(true);
-        lblEstado.setBackground(UIUtils.COLOR_SECONDARY);
+        String estUpper = pregunta.getEstado() != null ? pregunta.getEstado().toUpperCase() : "";
+        if ("APROBADA".equals(estUpper)) {
+            lblEstado.setBackground(UIUtils.COLOR_SUCCESS);
+        } else if ("RECHAZADA".equals(estUpper)) {
+            lblEstado.setBackground(UIUtils.COLOR_ERROR);
+        } else if ("PENDIENTE_REVISION".equals(estUpper)) {
+            lblEstado.setBackground(new Color(217, 119, 6));
+        } else {
+            lblEstado.setBackground(UIUtils.COLOR_SECONDARY);
+        }
         lblEstado.setForeground(Color.WHITE);
         lblEstado.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
 
@@ -107,11 +116,16 @@ public class DetallePreguntaDialog extends JDialog {
         JButton btnHistorial = new JButton("Ver Historial");
         UIUtils.stylizeSecondaryButton(btnHistorial);
         btnHistorial.addActionListener(e -> {
-            new HistorialRevisionesDialog((Frame) SwingUtilities.getWindowAncestor(this), pregunta.getId()).setVisible(true);
+            new HistorialRevisionesDialog(DetallePreguntaDialog.this, pregunta.getId()).setVisible(true);
         });
         btnPanel.add(btnHistorial);
 
         if ("BORRADOR".equalsIgnoreCase(pregunta.getEstado())) {
+            JButton btnEditar = new JButton("Editar Borrador");
+            UIUtils.stylizeSecondaryButton(btnEditar);
+            btnEditar.addActionListener(e -> abrirEdicionBorrador());
+            btnPanel.add(btnEditar);
+
             JButton btnEnviar = new JButton("Enviar a Revisión");
             UIUtils.stylizePrimaryButton(btnEnviar);
             btnEnviar.addActionListener(e -> enviarARevision());
@@ -201,5 +215,109 @@ public class DetallePreguntaDialog extends JDialog {
                         JOptionPane.ERROR_MESSAGE);
             }
         }
+    }
+
+    public void abrirEdicionBorrador() {
+        JDialog editDialog = new JDialog(this, "Editar Borrador — Pregunta #" + pregunta.getId() + " (v" + pregunta.getVersion() + ")", true);
+        editDialog.setSize(640, 620);
+        editDialog.setLocationRelativeTo(this);
+
+        JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
+        form.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        form.setBackground(UIUtils.COLOR_SURFACE);
+
+        JTextArea txtCtx = new JTextArea(pregunta.getContexto(), 3, 25);
+        txtCtx.setLineWrap(true);
+        txtCtx.setWrapStyleWord(true);
+        JTextArea txtDir = new JTextArea(pregunta.getPreguntaDirecta(), 2, 25);
+        txtDir.setLineWrap(true);
+        txtDir.setWrapStyleWord(true);
+
+        String opA = "", opB = "", opC = "", opD = "";
+        if (pregunta.getOpciones() != null) {
+            for (OpcionDTO op : pregunta.getOpciones()) {
+                if ("A".equalsIgnoreCase(op.getClave())) opA = op.getTexto();
+                else if ("B".equalsIgnoreCase(op.getClave())) opB = op.getTexto();
+                else if ("C".equalsIgnoreCase(op.getClave())) opC = op.getTexto();
+                else if ("D".equalsIgnoreCase(op.getClave())) opD = op.getTexto();
+            }
+        }
+        JTextField txtA = new JTextField(opA);
+        JTextField txtB = new JTextField(opB);
+        JTextField txtC = new JTextField(opC);
+        JTextField txtD = new JTextField(opD);
+        JComboBox<String> cmbResp = new JComboBox<>(new String[]{"A", "B", "C", "D"});
+        if (pregunta.getRespuestaCorrecta() != null) {
+            cmbResp.setSelectedItem(pregunta.getRespuestaCorrecta().toUpperCase());
+        }
+        JTextField txtJust = new JTextField(pregunta.getJustificacion());
+        JTextField txtBib = new JTextField(pregunta.getBibliografia());
+        JComboBox<String> cmbDif = new JComboBox<>(new String[]{"Bajo", "Medio", "Alto"});
+        if (pregunta.getNivelDificultad() != null) {
+            cmbDif.setSelectedItem(pregunta.getNivelDificultad());
+        }
+
+        form.add(new JLabel("Contexto / Enunciado:"));
+        form.add(new JScrollPane(txtCtx));
+        form.add(new JLabel("Pregunta Directa:"));
+        form.add(new JScrollPane(txtDir));
+        form.add(new JLabel("Opción A:"));
+        form.add(txtA);
+        form.add(new JLabel("Opción B:"));
+        form.add(txtB);
+        form.add(new JLabel("Opción C:"));
+        form.add(txtC);
+        form.add(new JLabel("Opción D:"));
+        form.add(txtD);
+        form.add(new JLabel("Respuesta Correcta:"));
+        form.add(cmbResp);
+        form.add(new JLabel("Justificación:"));
+        form.add(txtJust);
+        form.add(new JLabel("Bibliografía:"));
+        form.add(txtBib);
+        form.add(new JLabel("Nivel de Dificultad:"));
+        form.add(cmbDif);
+
+        JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+        JButton btnGuardar = new JButton("Guardar Cambios");
+        UIUtils.stylizePrimaryButton(btnGuardar);
+        btnGuardar.addActionListener(e -> {
+            PreguntaDTO dto = new PreguntaDTO();
+            dto.setContexto(txtCtx.getText().trim());
+            dto.setPreguntaDirecta(txtDir.getText().trim());
+            dto.setOpciones(List.of(
+                    new OpcionDTO("A", txtA.getText().trim()),
+                    new OpcionDTO("B", txtB.getText().trim()),
+                    new OpcionDTO("C", txtC.getText().trim()),
+                    new OpcionDTO("D", txtD.getText().trim())
+            ));
+            dto.setRespuestaCorrecta((String) cmbResp.getSelectedItem());
+            dto.setJustificacion(txtJust.getText().trim());
+            dto.setBibliografia(txtBib.getText().trim());
+            dto.setCompetencia(pregunta.getCompetencia());
+            dto.setTema(pregunta.getTema());
+            dto.setSubtema(pregunta.getSubtema());
+            dto.setNivelDificultad((String) cmbDif.getSelectedItem());
+            try {
+                ApiClient.getInstance().actualizarPregunta(pregunta.getId(), dto);
+                JOptionPane.showMessageDialog(editDialog, "Borrador actualizado exitosamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                editDialog.dispose();
+                if (onActualizado != null) onActualizado.run();
+                if (isVisible()) dispose();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(editDialog, "Error al actualizar borrador: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        JButton btnCancelar = new JButton("Cancelar");
+        UIUtils.stylizeSecondaryButton(btnCancelar);
+        btnCancelar.addActionListener(e -> editDialog.dispose());
+        south.add(btnGuardar);
+        south.add(btnCancelar);
+
+        JPanel root = new JPanel(new BorderLayout());
+        root.add(new JScrollPane(form), BorderLayout.CENTER);
+        root.add(south, BorderLayout.SOUTH);
+        editDialog.setContentPane(root);
+        editDialog.setVisible(true);
     }
 }

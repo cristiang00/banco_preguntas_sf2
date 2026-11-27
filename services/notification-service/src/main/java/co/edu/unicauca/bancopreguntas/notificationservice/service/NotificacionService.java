@@ -24,6 +24,9 @@ public class NotificacionService {
     private final NotificacionFactoryProvider factoryProvider;
     private final EmailSender emailSender;
 
+    @org.springframework.beans.factory.annotation.Value("${notification.admin.email:admin@unicauca.edu.co}")
+    private String adminEmail = "admin@unicauca.edu.co";
+
     public NotificacionService(NotificacionRepository notificacionRepository,
                                NotificacionFactoryProvider factoryProvider,
                                EmailSender emailSender) {
@@ -104,13 +107,31 @@ public class NotificacionService {
             data.put("autor", peae.getAutorNombre() != null ? peae.getAutorNombre() : ("Autor #" + peae.getAutorId()));
             data.put("tituloPregunta", peae.getContexto() != null ? peae.getContexto() : ("Pregunta #" + peae.getPreguntaId()));
 
+            // Notificar al administrador
             resultado.add(enviarNotificacionConReintentos(
                     peae.getEventId(),
                     peae.getCorrelationId(),
-                    "admin@unicauca.edu.co",
+                    adminEmail,
                     "PREGUNTA_ENVIADA_REVISION",
                     data
             ));
+
+            // HU6.S5.2: Notificar también a los revisores de la ronda anterior si existen
+            if (peae.getRevisoresAnteriores() != null) {
+                Set<String> notificados = new HashSet<>();
+                notificados.add(adminEmail);
+                for (String revEmail : peae.getRevisoresAnteriores()) {
+                    if (revEmail != null && !revEmail.isBlank() && notificados.add(revEmail.trim())) {
+                        resultado.add(enviarNotificacionConReintentos(
+                                peae.getEventId(),
+                                peae.getCorrelationId(),
+                                revEmail.trim(),
+                                "PREGUNTA_ENVIADA_REVISION",
+                                data
+                        ));
+                    }
+                }
+            }
         } else {
             log.info("[NotificacionService] Evento '{}' no requiere notificación por correo.", event.getEventType());
         }

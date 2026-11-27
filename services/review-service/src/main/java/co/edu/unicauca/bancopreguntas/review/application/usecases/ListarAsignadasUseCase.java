@@ -50,6 +50,7 @@ public class ListarAsignadasUseCase {
                     PreguntaDTO p = pOpt.get();
                     Map<String, Object> item = new LinkedHashMap<>();
                     item.put("revisionId", rev.getId());
+                    item.put("ronda", rev.getRonda());
                     item.put("preguntaId", p.getId());
                     item.put("contexto", p.getContexto());
                     item.put("preguntaDirecta", p.getPreguntaDirecta());

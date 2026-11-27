@@ -3,7 +3,10 @@ package co.edu.unicauca.bancopreguntas.review.domain.policy;
 import co.edu.unicauca.bancopreguntas.review.domain.model.EstadoRevision;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Revision;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Política y reglas de negocio del dominio para el proceso de Revisión por Pares (HU8).
@@ -15,11 +18,18 @@ public class PoliticaConsensoRevision {
     public static final int MAX_REVISORES = 3;
 
     /**
-     * Valida que la cantidad de revisores a asignar esté entre 1 y 3 (HU4).
+     * Valida que la cantidad de revisores a asignar esté entre 1 y 3 y sin duplicados (HU4).
      */
     public void validarCantidadRevisores(List<Long> revisorIds) {
         if (revisorIds == null || revisorIds.isEmpty()) {
             throw new IllegalArgumentException("Debe seleccionar al menos un revisor (entre 1 y 3 revisores permitidos)");
+        }
+        if (revisorIds.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("La lista de revisores no puede contener identificadores nulos");
+        }
+        Set<Long> unicos = new HashSet<>(revisorIds);
+        if (unicos.size() != revisorIds.size()) {
+            throw new IllegalArgumentException("No se puede asignar el mismo revisor más de una vez en la misma ronda");
         }
         if (revisorIds.size() > MAX_REVISORES) {
             throw new IllegalArgumentException("Solo se permite asignar un máximo de 3 revisores por pregunta");
@@ -66,13 +76,37 @@ public class PoliticaConsensoRevision {
 
     /**
      * Determina si se alcanzó consenso total para la aprobación de la pregunta (HU5).
-     * Consenso: todas las revisiones de la pregunta deben tener estado APROBADA.
+     * Consenso: todas las revisiones evaluadas deben tener estado APROBADA.
      */
     public boolean determinarConsensoAprobacion(List<Revision> todasRevisiones) {
         if (todasRevisiones == null || todasRevisiones.isEmpty()) {
             return false;
         }
         return todasRevisiones.stream().allMatch(r -> r.getEstado() == EstadoRevision.APROBADA);
+    }
+
+    /**
+     * Determina si se alcanzó consenso unánime de aprobación únicamente sobre las revisiones
+     * pertenecientes a la ronda activa (HU5 / HU6). Las rondas previas rechazadas se conservan
+     * en el historial pero no bloquean el consenso de nuevas versiones mejoradas.
+     */
+    public boolean determinarConsensoAprobacionRonda(List<Revision> todasRevisiones, Integer rondaActual) {
+        int ronda = (rondaActual != null && rondaActual >= 1) ? rondaActual : 1;
+        List<Revision> revisionesRonda = filtrarRevisionesDeRonda(todasRevisiones, ronda);
+        return determinarConsensoAprobacion(revisionesRonda);
+    }
+
+    /**
+     * Filtra las revisiones correspondientes a una ronda específica.
+     */
+    public List<Revision> filtrarRevisionesDeRonda(List<Revision> todasRevisiones, Integer rondaObjetivo) {
+        if (todasRevisiones == null || todasRevisiones.isEmpty()) {
+            return List.of();
+        }
+        int ronda = (rondaObjetivo != null && rondaObjetivo >= 1) ? rondaObjetivo : 1;
+        return todasRevisiones.stream()
+                .filter(r -> r != null && r.getRonda() == ronda)
+                .toList();
     }
 }
 

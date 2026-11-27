@@ -20,8 +20,11 @@ public class RevisionesAsignadasPanel extends JPanel {
     private final JComboBox<String> cmbDificultad;
     private final JTextField txtCompetencia;
     private final JLabel lblPagina;
+    private final JButton btnAnterior;
+    private final JButton btnSiguiente;
     private int paginaActual = 0;
     private final int tamanoPagina = 10;
+    private int totalPaginas = 1;
 
     public RevisionesAsignadasPanel() {
         setLayout(new BorderLayout(10, 10));
@@ -105,7 +108,7 @@ public class RevisionesAsignadasPanel extends JPanel {
         JPanel pnlPaginacion = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
         pnlPaginacion.setOpaque(false);
 
-        JButton btnAnterior = new JButton("◀ Anterior");
+        btnAnterior = new JButton("◀ Anterior");
         UIUtils.stylizeSecondaryButton(btnAnterior);
         btnAnterior.addActionListener(e -> {
             if (paginaActual > 0) {
@@ -114,14 +117,16 @@ public class RevisionesAsignadasPanel extends JPanel {
             }
         });
 
-        lblPagina = new JLabel("Página " + (paginaActual + 1));
+        lblPagina = new JLabel("Página 1 de 1");
         lblPagina.setFont(UIUtils.FONT_SUBTITLE);
 
-        JButton btnSiguiente = new JButton("Siguiente ▶");
+        btnSiguiente = new JButton("Siguiente ▶");
         UIUtils.stylizeSecondaryButton(btnSiguiente);
         btnSiguiente.addActionListener(e -> {
-            paginaActual++;
-            cargarDatos();
+            if (paginaActual < totalPaginas - 1) {
+                paginaActual++;
+                cargarDatos();
+            }
         });
 
         pnlPaginacion.add(btnAnterior);
@@ -147,6 +152,7 @@ public class RevisionesAsignadasPanel extends JPanel {
         add(panelInferior, BorderLayout.SOUTH);
     }
 
+    @SuppressWarnings("unchecked")
     public void cargarDatos() {
         SwingUtilities.invokeLater(() -> {
             try {
@@ -154,12 +160,20 @@ public class RevisionesAsignadasPanel extends JPanel {
                 String dificultad = (String) cmbDificultad.getSelectedItem();
                 String competencia = txtCompetencia.getText().trim();
 
-                List<RevisionItemDTO> lista = ApiClient.getInstance().listarRevisionesAsignadas(
+                java.util.Map<String, Object> pageData = ApiClient.getInstance().listarRevisionesAsignadasPaginado(
                         paginaActual, tamanoPagina, estado, dificultad, competencia);
+                List<RevisionItemDTO> lista = (List<RevisionItemDTO>) pageData.getOrDefault("content", java.util.Collections.emptyList());
+                Number totalPagesNum = (Number) pageData.getOrDefault("totalPages", 1);
+                Number totalElemsNum = (Number) pageData.getOrDefault("totalElements", lista.size());
+
                 revisionesActuales.clear();
                 revisionesActuales.addAll(lista);
 
-                lblPagina.setText("Página " + (paginaActual + 1) + " (" + lista.size() + " items)");
+                totalPaginas = Math.max(1, totalPagesNum.intValue());
+                lblPagina.setText("Página " + (paginaActual + 1) + " de " + totalPaginas
+                        + " (" + totalElemsNum.longValue() + " total)");
+                btnAnterior.setEnabled(paginaActual > 0);
+                btnSiguiente.setEnabled(paginaActual < totalPaginas - 1);
 
                 modelRevisiones.setRowCount(0);
                 for (RevisionItemDTO r : lista) {
@@ -187,9 +201,13 @@ public class RevisionesAsignadasPanel extends JPanel {
         }
 
         RevisionItemDTO rev = revisionesActuales.get(row);
-        if ("FINALIZADA".equalsIgnoreCase(rev.getEstadoRevision())) {
-            JOptionPane.showMessageDialog(this, "Esta revisión ya ha sido finalizada con veredicto.", "Aviso",
-                    JOptionPane.INFORMATION_MESSAGE);
+        String estadoActual = rev.getEstadoRevision();
+        if ("APROBADA".equalsIgnoreCase(estadoActual)
+                || "RECHAZADA".equalsIgnoreCase(estadoActual)
+                || "CERRADA_POR_RECHAZO".equalsIgnoreCase(estadoActual)) {
+            JOptionPane.showMessageDialog(this,
+                    "Esta revisión ya ha sido finalizada con estado: " + estadoActual + ".",
+                    "Aviso", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
@@ -243,8 +261,15 @@ public class RevisionesAsignadasPanel extends JPanel {
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
                     String obs = txtObs.getText().trim();
-                    ApiClient.getInstance().emitirDecision(rev.getId(), "APROBADA",
-                            obs.isEmpty() ? "Cumple todos los criterios pedagógicos y técnicos." : obs);
+                    int cumplidos = (chkPedagogico.isSelected() ? 1 : 0)
+                            + (chkTecnico.isSelected() ? 1 : 0)
+                            + (chkRedaccion.isSelected() ? 1 : 0);
+                    double calif = Math.round((cumplidos / 3.0) * 50.0) / 10.0;
+                    String comentarioEval = obs.isEmpty() ? "Cumple todos los criterios pedagógicos y técnicos." : obs;
+                    ApiClient.getInstance().registrarEvaluacion(rev.getId(),
+                            "Evaluación Integral (Pedagógico, Técnico, Redacción)", calif, comentarioEval,
+                            obs.isEmpty() ? java.util.Collections.emptyList() : List.of(obs));
+                    ApiClient.getInstance().emitirDecision(rev.getId(), "APROBADA", comentarioEval);
                     JOptionPane.showMessageDialog(dialog, "Pregunta aprobada exitosamente.", "Éxito",
                             JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
@@ -274,6 +299,12 @@ public class RevisionesAsignadasPanel extends JPanel {
                     JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
+                    int cumplidos = (chkPedagogico.isSelected() ? 1 : 0)
+                            + (chkTecnico.isSelected() ? 1 : 0)
+                            + (chkRedaccion.isSelected() ? 1 : 0);
+                    double calif = Math.round((cumplidos / 3.0) * 50.0) / 10.0;
+                    ApiClient.getInstance().registrarEvaluacion(rev.getId(),
+                            "Evaluación Integral (Pedagógico, Técnico, Redacción)", calif, obs, List.of());
                     ApiClient.getInstance().emitirDecision(rev.getId(), "RECHAZADA", obs);
                     JOptionPane.showMessageDialog(dialog, "Pregunta rechazada con observaciones registradas.", "Éxito",
                             JOptionPane.INFORMATION_MESSAGE);

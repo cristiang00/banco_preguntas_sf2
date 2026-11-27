@@ -1,9 +1,7 @@
 # Progreso del Sprint 3: Seguridad y Arquitectura Limpia (HU6 a HU12)
 
-> **Documento base:** `docs/HU-Sprint-3-para-Jira.pdf`  
-> **Fecha de auditoría:** 21 de Noviembre de 2026  
-> **Fecha de cierre:** 22 de Noviembre de 2026  
-> **Estado general del build:** ✅ **BUILD SUCCESS** — 12/12 módulos, todos los tests en verde.
+> **Documento base:** `HU-Sprint-3-para-Jira.pdf`  
+> **Estado general del build:** ✅ **BUILD SUCCESS** — 12/12 módulos, **119/119** pruebas unitarias y de seguridad en verde.
 
 ---
 
@@ -137,7 +135,7 @@
 - [x] **HU6.S5.3** [HECHO] Frontend: confirmación y color/estado actualizado.  
   *Evidencia:* Diálogos en `ListarPreguntasPanel` y `DetallePreguntaDialog`.
 - [x] **HU6.S5.4** [HECHO] Pruebas unitarias de nueva ronda y evento con broker simulado.  
-  *Evidencia:* `LifecycleStateTest.enviarARevision_exitoso()`.
+  *Evidencia:* `LifecycleStateTest.enviarARevision_exitoso()` y `enviarARevision_nuevaRonda_publicaEventoEnBrokerSimulado()`.
 
 ---
 
@@ -155,29 +153,29 @@
 - [x] **HU7.S2.2** [HECHO] Adaptar login del frontend para obtener token de Keycloak y enviarlo al gateway.  
   *Evidencia:* `ApiClient.loginWithKeycloak()` hace POST a Keycloak, parsea `access_token` y extrae rol de `realm_access.roles` (Commit `1bc3677`).
 - [x] **HU7.S2.3** [HECHO] Retirar login propio y emisor JWT de `users-service`.  
-  *Evidencia:* `AuthController.java` y `JwtUtil.java` marcados `@Deprecated(since="2.0.0")` con javadoc explicativo (Commit `1bc3677`).
+  *Evidencia:* `AuthController.java`, `JwtUtil.java` y dependencias `jjwt` eliminados por completo de `users-service` y `api-gateway`; autenticación delegada exclusivamente a Keycloak OIDC.
 - [x] **HU7.S2.4** [HECHO] Pruebas unitarias del cliente de login con Keycloak simulado.  
-  *Evidencia:* `ApiClientAndFrontendTest.testLoginWithKeycloakSimulado()` usando `HttpServer` en puerto dinámico. 4/4 verde (Commit `1bc3677`).
-- [x] **HU7.S3.1** [HECHO] Validación JWT RS256 contra JWKS de Keycloak.  
-  *Evidencia:* `JwtValidator.java` usa JJWT `keyLocator()` descargando clave RSA del JWKS endpoint de Keycloak con caché (Commit `1bc3677`).
+  *Evidencia:* `ApiClientAndFrontendTest` prueba login exitoso (`200`) y credenciales inválidas (`401`) con `HttpServer` simulando Keycloak. 5/5 verde.
+- [x] **HU7.S3.1** [HECHO] Validación JWT RS256 contra JWKS de Keycloak con Spring Security OAuth2 Resource Server.  
+  *Evidencia:* `GatewaySecurityConfig` y `ResourceServerSecurityConfig` en los 7 microservicios usando `spring-boot-starter-oauth2-resource-server` y `NimbusJwtDecoder.withJwkSetUri(...)` (sin secreto HS256 compartido).
 - [x] **HU7.S3.2** [HECHO] Mapear roles del realm y propagar identidad y rol en cabeceras a los microservicios.  
-  *Evidencia:* `GatewayRoutingController` extrae `realm_access.roles`, propaga `X-User-Id`, `X-User-Role`, `X-User-Name` sobrescribiendo valores del cliente (Commit `1bc3677`).
+  *Evidencia:* `KeycloakJwtExtractor` y `GatewayRoutingController` mapean `realm_access.roles` a `ROLE_*`, eliminan `X-User-*` del cliente y propagan Bearer JWT verificado.
 - [x] **HU7.S3.3** [HECHO] Documentar esquema Bearer en Swagger.  
-  *Evidencia:* `OpenApiConfig.java` con `@SecurityScheme` Bearer JWT; `@ApiResponses` con 401, 403 en endpoints del gateway (Commit `1bc3677`).
-- [x] **HU7.S3.4** [HECHO] Pruebas unitarias de tokens válidos, vencidos y firma alterada.  
-  *Evidencia:* `GatewaySecurityAndRoutingTest`: 16 tests incluyendo RS256 válido, RS256 expirado, firma alterada, roles Keycloak. 16/16 verde (Commit `1bc3677`).
+  *Evidencia:* `@SecurityScheme` Bearer JWT en `OpenApiConfig` del gateway y en los 7 microservicios; `@ApiResponses` con `401` y `403`.
+- [x] **HU7.S3.4** [HECHO] Pruebas unitarias de tokens válidos, vencidos y firmados con otra clave.  
+  *Evidencia:* `GatewaySecurityAndRoutingTest` (14 pruebas reales con `MockMvc` + Spring Security + `NimbusJwtDecoder` RS256).
 - [x] **HU7.S4.1** [HECHO] Definir matriz rol-endpoint (AUTOR, ADMINISTRADOR, REVISOR).  
-  *Evidencia:* `GatewayRoutingController` aplica `extractRole()` y retorna 403 si el rol no tiene permiso por ruta; documentado en `docs/arquitectura-sprint3.md`.
-- [x] **HU7.S4.2** [HECHO] Aplicar autorización por rol en gateway.  
-  *Evidencia:* Rutas `POST /revisiones/asignar` → solo ADMINISTRADOR; `GET /revisiones/asignadas` → REVISOR; `POST /preguntas` → AUTOR/ADMINISTRADOR (Commit `1bc3677`).
+  *Evidencia:* `GatewaySecurityConfig` y `docs/Documento-Arquitectura-Sprint3.pdf`.
+- [x] **HU7.S4.2** [HECHO] Aplicar autorización por rol en gateway y en cada microservicio con `@PreAuthorize`.  
+  *Evidencia:* `@EnableMethodSecurity` + `@PreAuthorize` en los controllers de los 7 microservicios sin comparar cabeceras `X-User-*` manualmente.
 - [x] **HU7.S4.3** [HECHO] Documentar 403 en Swagger de todos los endpoints protegidos.  
-  *Evidencia:* `@ApiResponse(responseCode = "403")` en `GatewayRoutingController`, `ReviewController`, `QuestionController`, `LifecycleController`.
+  *Evidencia:* `@ApiResponse(responseCode = "403")` en todos los controllers protegidos.
 - [x] **HU7.S4.4** [HECHO] Pruebas unitarias de autorización por rol.  
-  *Evidencia:* `GatewaySecurityAndRoutingTest`: tests de tokens con roles incorrectos retornan 403 (Commit `1bc3677`).
+  *Evidencia:* `GatewaySecurityAndRoutingTest` (matriz completa AUTOR/REVISOR/ADMINISTRADOR) y `ReviewSecurityAuthorizationTest` (`@PreAuthorize`).
 - [x] **HU7.S5.1** [HECHO] Quitar publicación de puertos directos en compose dejando solo gateway (8080) y keycloak (8089).  
-  *Evidencia:* `docker-compose.yml` no expone puertos 8081-8087.
+  *Evidencia:* `docker-compose.yml` no expone puertos 8081–8087.
 - [x] **HU7.S5.2** [HECHO] Ignorar cabeceras `X-User-*` sin token verificado y retirar valores por defecto en controllers.  
-  *Evidencia:* `LifecycleController`, `QuestionController`, `ReviewController` cambiados de `defaultValue` a `required = true` para `X-User-Id` (esta sesión).
+  *Evidencia:* Los 7 microservicios exigen JWT RS256 verificado y extraen identidad vía `@AuthenticationPrincipal Jwt`; acceso directo con `X-User-*` falsificados responde `401 Unauthorized`.
 - [ ] **HU7.S5.3** [PENDIENTE - MANUAL] Probar en Postman que el acceso directo falla y guardar evidencia.  
   *Acción manual requerida:* Capturar intento de conexión a puerto interno.
 
@@ -191,7 +189,7 @@
 - [x] **HU10.S1.3** [HECHO] Pruebas de cada regla de validación y de `ValidationEngine`.  
   *Evidencia:* `ValidationRulesTest.java` prueba todas las reglas (campos, respuesta correcta, dificultad, bibliografía, catálogos) y el motor.
 - [x] **HU10.S2.1** [HECHO] Pruebas de cada estado, `QuestionStateFactory` y `LifecycleService`.  
-  *Evidencia:* `LifecycleStateTest.java`: 13 tests incluyendo `QuestionStateFactory.fromDTO/fromString` para todos los estados, transición APROBAR/RECHAZAR, `puedeEditar` por estado.
+  *Evidencia:* `LifecycleStateTest.java`: 14 tests incluyendo `QuestionStateFactory.fromDTO/fromString` para todos los estados, transición APROBAR/RECHAZAR, `puedeEditar` por estado y publicación en broker simulado para nueva ronda.
 - [x] **HU10.S2.2** [HECHO] Pruebas de reglas de Revisión: 1-3 revisores, autor no revisor, rechazo con observación, consenso.  
   *Evidencia:* `PoliticaConsensoRevisionTest.java` (6 pruebas) + `ReviewHexagonalUseCaseTest.java` (casos de uso con Mockito) + `ReviewServiceTest.java` (13 tests).
 - [x] **HU10.S3.1** [HECHO] Pruebas de `UsuarioService` y roles adaptadas a Keycloak.  

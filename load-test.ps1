@@ -51,8 +51,8 @@ if ($times.Count -gt 0) {
     $min = ($times | Measure-Object -Minimum).Minimum
     $max = ($times | Measure-Object -Maximum).Maximum
     Write-Host " Latencia Promedio: $([math]::Round($avg, 2)) ms" -ForegroundColor White
-    Write-Host " Latencia Mínima:   $min ms" -ForegroundColor White
-    Write-Host " Latencia Máxima:   $max ms" -ForegroundColor White
+    Write-Host " Latencia Minima:   $min ms" -ForegroundColor White
+    Write-Host " Latencia Maxima:   $max ms" -ForegroundColor White
     $throughput = [math]::Round($successCount / $swTotal.Elapsed.TotalSeconds, 2)
     Write-Host " Throughput (RPS):  $throughput req/s" -ForegroundColor Cyan
 }

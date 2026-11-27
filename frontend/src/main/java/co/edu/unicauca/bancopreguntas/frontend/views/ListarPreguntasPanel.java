@@ -25,6 +25,9 @@ public class ListarPreguntasPanel extends JPanel {
     private final JButton btnAnterior;
     private final JButton btnSiguiente;
     private final JLabel lblPagina;
+    private final JLabel lblEstadoAccion;
+    private final JButton btnEditarBorrador;
+    private final JButton btnNuevaVersion;
 
     private int paginaActual = 0;
     private final int TAMANO_PAGINA = 10;
@@ -191,9 +194,33 @@ public class ListarPreguntasPanel extends JPanel {
         });
         panelAcciones.add(btnHistorial);
 
-        // HU6.S3.4 / HU6.S4.3: Botón Crear versión mejorada
-        JButton btnNuevaVersion = new JButton("Crear versión mejorada");
+        btnEditarBorrador = new JButton("Editar Borrador");
+        UIUtils.stylizeSecondaryButton(btnEditarBorrador);
+        btnEditarBorrador.setEnabled(false);
+        btnEditarBorrador.setToolTipText("Solo disponible para preguntas en estado BORRADOR");
+        btnEditarBorrador.addActionListener(e -> {
+            int row = tabla.getSelectedRow();
+            if (row != -1 && row < preguntasActuales.size()) {
+                PreguntaDTO p = preguntasActuales.get(row);
+                if (!"BORRADOR".equalsIgnoreCase(p.getEstado())) {
+                    JOptionPane.showMessageDialog(this, "Solo se pueden editar preguntas en estado BORRADOR.", "Aviso", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                DetallePreguntaDialog dialog = new DetallePreguntaDialog(
+                        SwingUtilities.getWindowAncestor(this), p, this::cargarDatos
+                );
+                dialog.abrirEdicionBorrador();
+            } else {
+                JOptionPane.showMessageDialog(this, "Seleccione una pregunta en BORRADOR.", "Aviso", JOptionPane.WARNING_MESSAGE);
+            }
+        });
+        panelAcciones.add(btnEditarBorrador);
+
+        // HU6.S3.4 / HU6.S4.3: Botón Crear versión mejorada (deshabilitado si estado != RECHAZADA)
+        btnNuevaVersion = new JButton("Crear versión mejorada");
         UIUtils.stylizePrimaryButton(btnNuevaVersion);
+        btnNuevaVersion.setEnabled(false);
+        btnNuevaVersion.setToolTipText("Solo disponible para preguntas en estado RECHAZADA");
         btnNuevaVersion.addActionListener(e -> {
             int row = tabla.getSelectedRow();
             if (row != -1) {
@@ -227,22 +254,70 @@ public class ListarPreguntasPanel extends JPanel {
         panelAcciones.add(btnEnviarRevision);
         panelInferior.add(panelAcciones, BorderLayout.EAST);
 
+        lblEstadoAccion = new JLabel("Seleccione una pregunta. 'Crear versión mejorada' solo se habilita en estado RECHAZADA.");
+        lblEstadoAccion.setFont(UIUtils.FONT_SMALL);
+        lblEstadoAccion.setForeground(UIUtils.COLOR_TEXT_MUTED);
+        panelInferior.add(lblEstadoAccion, BorderLayout.SOUTH);
+
+        tabla.getSelectionModel().addListSelectionListener(ev -> {
+            if (!ev.getValueIsAdjusting()) {
+                actualizarEstadoBotonNuevaVersion();
+            }
+        });
+
         add(panelInferior, BorderLayout.SOUTH);
     }
 
+    private void actualizarEstadoBotonNuevaVersion() {
+        int row = tabla.getSelectedRow();
+        if (row >= 0 && row < preguntasActuales.size()) {
+            PreguntaDTO p = preguntasActuales.get(row);
+            boolean esRechazada = "RECHAZADA".equalsIgnoreCase(p.getEstado());
+            boolean esBorrador = "BORRADOR".equalsIgnoreCase(p.getEstado());
+            btnNuevaVersion.setEnabled(esRechazada);
+            btnEditarBorrador.setEnabled(esBorrador);
+            if (esRechazada) {
+                btnNuevaVersion.setToolTipText("Crear versión mejorada v" + (p.getVersion() + 1) + " en estado BORRADOR");
+                lblEstadoAccion.setText("Pregunta #" + p.getId() + " en estado RECHAZADA: puede crear una versión mejorada.");
+            } else if (esBorrador) {
+                String msg = "Pregunta #" + p.getId() + " (v" + p.getVersion() + ") en BORRADOR: puede editarla o enviarla a revisión.";
+                btnNuevaVersion.setToolTipText("Solo disponible para preguntas en estado RECHAZADA");
+                lblEstadoAccion.setText(msg);
+            } else {
+                String msg = "No se puede crear una nueva versión en estado " + p.getEstado() + " (solo permitido desde RECHAZADA).";
+                btnNuevaVersion.setToolTipText(msg);
+                lblEstadoAccion.setText(msg);
+            }
+        } else {
+            btnNuevaVersion.setEnabled(false);
+            btnEditarBorrador.setEnabled(false);
+            btnNuevaVersion.setToolTipText("Solo disponible para preguntas en estado RECHAZADA");
+            if (!preguntasActuales.isEmpty()) {
+                lblEstadoAccion.setText("Seleccione una pregunta. 'Crear versión mejorada' solo se habilita en estado RECHAZADA.");
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     public void cargarDatos() {
         String estadoSel = (String) cmbEstado.getSelectedItem();
         String difSel = (String) cmbDificultad.getSelectedItem();
 
         SwingUtilities.invokeLater(() -> {
             try {
-                List<PreguntaDTO> lista = ApiClient.getInstance().listarPreguntas(estadoSel, difSel, paginaActual, TAMANO_PAGINA);
+                java.util.Map<String, Object> pageData = ApiClient.getInstance().listarPreguntasPaginado(
+                        estadoSel, difSel, paginaActual, TAMANO_PAGINA
+                );
+                List<PreguntaDTO> lista = (List<PreguntaDTO>) pageData.getOrDefault("content", java.util.Collections.emptyList());
+                Number totalPagesNum = (Number) pageData.getOrDefault("totalPages", 1);
+                Number totalElemsNum = (Number) pageData.getOrDefault("totalElements", lista.size());
+
                 preguntasActuales.clear();
                 preguntasActuales.addAll(lista);
 
                 tableModel.setRowCount(0);
                 if (lista.isEmpty()) {
-                    JOptionPane.showMessageDialog(this, "No se ha encontrado ninguna pregunta con los filtros seleccionados.", "Información", JOptionPane.INFORMATION_MESSAGE);
+                    lblEstadoAccion.setText("No se encontraron preguntas con los filtros seleccionados.");
                 } else {
                     for (PreguntaDTO p : lista) {
                         String contextoCorto = p.getContexto() != null && p.getContexto().length() > 60
@@ -259,11 +334,13 @@ public class ListarPreguntasPanel extends JPanel {
                     }
                 }
 
-                // Cálculo de paginación
-                totalPaginas = Math.max(1, (int) Math.ceil((double) (lista.size() + (paginaActual * TAMANO_PAGINA)) / TAMANO_PAGINA));
-                lblPagina.setText("Página " + (paginaActual + 1) + " de " + Math.max(paginaActual + 1, totalPaginas));
+                // Paginación exacta desde el backend
+                totalPaginas = Math.max(1, totalPagesNum.intValue());
+                lblPagina.setText("Página " + (paginaActual + 1) + " de " + totalPaginas
+                        + " (" + totalElemsNum.longValue() + " total)");
                 btnAnterior.setEnabled(paginaActual > 0);
-                btnSiguiente.setEnabled(lista.size() == TAMANO_PAGINA);
+                btnSiguiente.setEnabled(paginaActual < totalPaginas - 1);
+                actualizarEstadoBotonNuevaVersion();
 
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Error cargando preguntas desde API Gateway: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);

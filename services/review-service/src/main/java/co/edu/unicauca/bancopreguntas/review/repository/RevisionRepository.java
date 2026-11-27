@@ -1,7 +1,7 @@
 package co.edu.unicauca.bancopreguntas.review.repository;
 
-import co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision;
-import co.edu.unicauca.bancopreguntas.review.domain.RevisionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.RevisionEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +18,8 @@ public interface RevisionRepository extends JpaRepository<RevisionEntity, Long> 
     List<RevisionEntity> findByPreguntaId(Long preguntaId);
 
     Optional<RevisionEntity> findByPreguntaIdAndRevisorId(Long preguntaId, Long revisorId);
+
+    Optional<RevisionEntity> findByPreguntaIdAndRevisorIdAndRonda(Long preguntaId, Long revisorId, Integer ronda);
 
     Page<RevisionEntity> findByRevisorId(Long revisorId, Pageable pageable);
 

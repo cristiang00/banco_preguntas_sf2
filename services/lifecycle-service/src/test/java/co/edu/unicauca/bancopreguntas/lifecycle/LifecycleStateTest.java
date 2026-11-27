@@ -330,4 +330,42 @@ class LifecycleStateTest {
         cicloVidaRepo.save(enAprobada);
         assertFalse(service.puedeEditar(p3));
     }
+
+    @Test
+    @DisplayName("HU6.S5.4: Nueva ronda (versión 2) publica en el broker simulado el evento con versión y correos de revisores de la ronda anterior")
+    void enviarARevision_nuevaRonda_publicaEventoEnBrokerSimulado() throws Exception {
+        co.edu.unicauca.bancopreguntas.lifecycle.client.QuestionsServiceClient questionsClient =
+                org.mockito.Mockito.mock(co.edu.unicauca.bancopreguntas.lifecycle.client.QuestionsServiceClient.class);
+        co.edu.unicauca.bancopreguntas.lifecycle.client.ReviewServiceClient reviewClient =
+                org.mockito.Mockito.mock(co.edu.unicauca.bancopreguntas.lifecycle.client.ReviewServiceClient.class);
+        org.springframework.amqp.rabbit.core.RabbitTemplate rabbit =
+                org.mockito.Mockito.mock(org.springframework.amqp.rabbit.core.RabbitTemplate.class);
+
+        Long preguntaId = 401L;
+        Long autorId = 7L;
+        org.mockito.Mockito.when(questionsClient.obtenerVersion(preguntaId)).thenReturn(2);
+        org.mockito.Mockito.when(reviewClient.obtenerEmailsRevisoresAnteriores(preguntaId))
+                .thenReturn(List.of("revisor1@unicauca.edu.co"));
+
+        LifecycleEventPublisher brokerPublisher = new LifecycleEventPublisher(null, rabbit);
+        LifecycleService svc = new LifecycleService(cicloVidaRepo, historialRepo, brokerPublisher, questionsClient, reviewClient);
+
+        // La pregunta fue rechazada y el autor creó la versión mejorada: vuelve a Borrador
+        cicloVidaRepo.save(new PreguntaCicloVidaEntity(preguntaId, autorId, EstadoPreguntaDTO.BORRADOR));
+
+        EstadoPreguntaDTO estado = svc.enviarARevision(preguntaId, autorId, "Autor Uno", "Contexto v2", "¿Pregunta v2?", "corr-ronda-2");
+
+        assertEquals(EstadoPreguntaDTO.PENDIENTE_REVISION, estado);
+
+        org.mockito.ArgumentCaptor<String> routingKey = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<String> json = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(rabbit, org.mockito.Mockito.times(1)).convertAndSend(
+                org.mockito.ArgumentMatchers.eq(co.edu.unicauca.bancopreguntas.contracts.events.RabbitMQConstants.EXCHANGE_NAME),
+                routingKey.capture(), json.capture());
+
+        assertTrue(routingKey.getValue().endsWith("PreguntaEnviadaARevision"));
+        assertTrue(json.getValue().contains("\"version\":2"), "El evento debe transportar el número de versión");
+        assertTrue(json.getValue().contains("revisor1@unicauca.edu.co"), "El evento debe incluir los revisores de la ronda anterior");
+        org.mockito.Mockito.verify(questionsClient).actualizarProyeccionEstado(preguntaId, "PENDIENTE_REVISION");
+    }
 }

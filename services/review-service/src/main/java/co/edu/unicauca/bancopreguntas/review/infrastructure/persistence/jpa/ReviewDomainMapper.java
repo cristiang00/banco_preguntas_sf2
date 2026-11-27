@@ -1,8 +1,8 @@
 package co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa;
 
-import co.edu.unicauca.bancopreguntas.review.domain.EvaluacionRevisorEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.ObservacionEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.RevisionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EvaluacionRevisorEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.ObservacionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.RevisionEntity;
 import co.edu.unicauca.bancopreguntas.review.domain.model.EstadoRevision;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Evaluacion;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Observacion;
@@ -29,6 +29,7 @@ public final class ReviewDomainMapper {
                 jpa.getRevisorEmail(),
                 jpa.getCompetencia(),
                 jpa.getNivelDificultad(),
+                jpa.getRonda(),
                 estado,
                 jpa.getFechaAsignacion(),
                 jpa.getFechaDecision()
@@ -37,9 +38,9 @@ public final class ReviewDomainMapper {
 
     public static RevisionEntity toJpa(Revision domain) {
         if (domain == null) return null;
-        co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision estado = domain.getEstado() != null
-                ? co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision.valueOf(domain.getEstado().name())
-                : co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision.ASIGNADA;
+        co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision estado = domain.getEstado() != null
+                ? co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision.valueOf(domain.getEstado().name())
+                : co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision.ASIGNADA;
 
         RevisionEntity entity = new RevisionEntity(
                 domain.getPreguntaId(),
@@ -47,11 +48,14 @@ public final class ReviewDomainMapper {
                 domain.getRevisorNombre(),
                 domain.getRevisorEmail(),
                 domain.getCompetencia(),
-                domain.getNivelDificultad()
+                domain.getNivelDificultad(),
+                domain.getRonda()
         );
         entity.setId(domain.getId());
         entity.setEstado(estado);
-        entity.setFechaAsignacion(domain.getFechaAsignacion());
+        if (domain.getFechaAsignacion() != null) {
+            entity.setFechaAsignacion(domain.getFechaAsignacion());
+        }
         entity.setFechaDecision(domain.getFechaDecision());
         return entity;
     }
@@ -77,6 +81,9 @@ public final class ReviewDomainMapper {
                 domain.getComentario()
         );
         entity.setId(domain.getId());
+        if (domain.getFechaEvaluacion() != null) {
+            entity.setFechaEvaluacion(domain.getFechaEvaluacion());
+        }
         return entity;
     }
 
@@ -100,6 +107,9 @@ public final class ReviewDomainMapper {
                 domain.getTexto()
         );
         entity.setId(domain.getId());
+        if (domain.getFechaCreacion() != null) {
+            entity.setFecha(domain.getFechaCreacion());
+        }
         entity.setVisibleAutor(domain.isVisibleAutor());
         return entity;
     }

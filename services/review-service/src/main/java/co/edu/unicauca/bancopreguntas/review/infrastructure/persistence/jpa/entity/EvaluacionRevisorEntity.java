@@ -1,4 +1,4 @@
-package co.edu.unicauca.bancopreguntas.review.domain;
+package co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -43,4 +43,6 @@ public class EvaluacionRevisorEntity {
     public Double getCalificacion() { return calificacion; }
     public String getComentario() { return comentario; }
     public LocalDateTime getFechaEvaluacion() { return fechaEvaluacion; }
+    public void setFechaEvaluacion(LocalDateTime fechaEvaluacion) { this.fechaEvaluacion = fechaEvaluacion; }
 }
+

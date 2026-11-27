@@ -66,6 +66,16 @@ public class InMemoryRevisionRepositoryAdapter implements RevisionRepositoryPort
     }
 
     @Override
+    public Optional<Revision> findByPreguntaIdAndRevisorIdAndRonda(Long preguntaId, Long revisorId, Integer ronda) {
+        int rTarget = (ronda != null && ronda >= 1) ? ronda : 1;
+        return revisiones.values().stream()
+                .filter(r -> r.getPreguntaId().equals(preguntaId)
+                        && r.getRevisorId().equals(revisorId)
+                        && r.getRonda() == rTarget)
+                .findFirst();
+    }
+
+    @Override
     public Map<String, Object> findByRevisorIdWithFilters(Long revisorId, EstadoRevision estado,
                                                           String competencia, String dificultad,
                                                           int page, int size) {
@@ -123,6 +133,13 @@ public class InMemoryRevisionRepositoryAdapter implements RevisionRepositoryPort
     public List<Observacion> findObservacionesByPreguntaId(Long preguntaId) {
         return observaciones.stream()
                 .filter(o -> o.getPreguntaId().equals(preguntaId))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Evaluacion> findEvaluacionesByRevisionId(Long revisionId) {
+        return evaluaciones.values().stream()
+                .filter(e -> e.getRevisionId().equals(revisionId))
                 .collect(Collectors.toList());
     }
 }

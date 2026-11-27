@@ -144,7 +144,7 @@ public class AsignarRevisoresPanel extends JPanel {
 
         // Validar no asignación al autor de la pregunta
         for (UserSummaryDTO u : seleccionados) {
-            if (u.getId().equals(p.getAutorId())) {
+            if (java.util.Objects.equals(u.getId(), p.getAutorId())) {
                 JOptionPane.showMessageDialog(this, "Conflicto de interés: El revisor '" + u.getNombreCompleto() + "' es el autor de la pregunta.", "Error de Validación", JOptionPane.ERROR_MESSAGE);
                 return;
             }

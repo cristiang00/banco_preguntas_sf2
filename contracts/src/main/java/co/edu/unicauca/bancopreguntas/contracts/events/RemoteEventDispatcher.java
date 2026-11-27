@@ -10,7 +10,8 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Despacha eventos de dominio de forma asíncrona hacia microservicios suscriptores (Notification y Audit).
+ * Despacha eventos de dominio de forma asíncrona hacia microservicios suscriptores (Notification y Audit)
+ * como fallback cuando el broker RabbitMQ no está disponible.
  */
 public class RemoteEventDispatcher {
 
@@ -21,28 +22,36 @@ public class RemoteEventDispatcher {
             .build();
 
     public static void dispatchAsync(String json, String notificationServiceUrl, String auditServiceUrl) {
+        dispatchAsync(json, notificationServiceUrl, auditServiceUrl, null);
+    }
+
+    public static void dispatchAsync(String json, String notificationServiceUrl, String auditServiceUrl, String bearerToken) {
         if (json == null || json.isBlank()) return;
 
         CompletableFuture.runAsync(() -> {
             if (notificationServiceUrl != null && !notificationServiceUrl.isBlank()) {
-                sendPost(notificationServiceUrl + "/notificaciones/eventos", json, "NotificationService");
+                sendPost(notificationServiceUrl + "/notificaciones/eventos", json, "NotificationService", bearerToken);
             }
             if (auditServiceUrl != null && !auditServiceUrl.isBlank()) {
-                sendPost(auditServiceUrl + "/auditoria/eventos", json, "AuditService");
+                sendPost(auditServiceUrl + "/auditoria/eventos", json, "AuditService", bearerToken);
             }
         });
     }
 
-    private static void sendPost(String url, String json, String targetName) {
+    private static void sendPost(String url, String json, String targetName, String bearerToken) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(json))
-                    .timeout(Duration.ofSeconds(2))
-                    .build();
+                    .timeout(Duration.ofSeconds(2));
 
-            client.sendAsync(request, HttpResponse.BodyHandlers.discarding())
+            if (bearerToken != null && !bearerToken.isBlank()) {
+                String headerVal = bearerToken.startsWith("Bearer ") ? bearerToken : "Bearer " + bearerToken;
+                reqBuilder.header("Authorization", headerVal);
+            }
+
+            client.sendAsync(reqBuilder.build(), HttpResponse.BodyHandlers.discarding())
                     .thenAccept(res -> {
                         if (res.statusCode() >= 200 && res.statusCode() < 300) {
                             log.log(Level.INFO, "[RemoteEventDispatcher] Evento entregado exitosamente a " + targetName + " (" + url + ")");

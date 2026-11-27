@@ -1,6 +1,6 @@
 package co.edu.unicauca.bancopreguntas.review.repository;
 
-import co.edu.unicauca.bancopreguntas.review.domain.ObservacionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.ObservacionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

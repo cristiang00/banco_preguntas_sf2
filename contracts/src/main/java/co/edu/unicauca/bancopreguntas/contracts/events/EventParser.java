@@ -1,8 +1,10 @@
 package co.edu.unicauca.bancopreguntas.contracts.events;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Parser para deserializar eventos de dominio enviados como JSON/Map entre microservicios.
@@ -14,6 +16,10 @@ public class EventParser {
         String eventType = (String) payload.get("eventType");
         if (eventType == null) return null;
 
+        String rawEventId = payload.get("eventId") instanceof String s && !s.isBlank()
+                ? s
+                : UUID.randomUUID().toString();
+        LocalDateTime occurredOn = parseLocalDateTime(payload.get("occurredOn"));
         String correlationId = (String) payload.get("correlationId");
 
         switch (eventType) {
@@ -33,7 +39,7 @@ public class EventParser {
                         }
                     }
                 }
-                return new RevisoresAsignadosEvent(preguntaId, autorId, autorNombre, contexto, revisores, correlationId);
+                return new RevisoresAsignadosEvent(rawEventId, preguntaId, autorId, autorNombre, contexto, revisores, occurredOn, correlationId);
             }
             case PreguntaEnviadaARevisionEvent.EVENT_TYPE: {
                 Long preguntaId = getLong(payload, "preguntaId");
@@ -41,7 +47,17 @@ public class EventParser {
                 String autorNombre = (String) payload.get("autorNombre");
                 String contexto = (String) payload.get("contexto");
                 String preguntaDirecta = (String) payload.get("preguntaDirecta");
-                return new PreguntaEnviadaARevisionEvent(preguntaId, autorId, autorNombre, contexto, preguntaDirecta, correlationId);
+                Long verLong = getLong(payload, "version");
+                Integer version = verLong != null ? verLong.intValue() : 1;
+                List<String> revisoresAnteriores = new ArrayList<>();
+                if (payload.get("revisoresAnteriores") instanceof List<?> list) {
+                    for (Object o : list) {
+                        if (o != null && !o.toString().isBlank()) {
+                            revisoresAnteriores.add(o.toString());
+                        }
+                    }
+                }
+                return new PreguntaEnviadaARevisionEvent(rawEventId, preguntaId, autorId, autorNombre, contexto, preguntaDirecta, version, revisoresAnteriores, occurredOn, correlationId);
             }
             case PreguntaAprobadaEvent.EVENT_TYPE: {
                 Long preguntaId = getLong(payload, "preguntaId");
@@ -50,7 +66,7 @@ public class EventParser {
                 String autorEmail = (String) payload.get("autorEmail");
                 String contexto = (String) payload.get("contexto");
                 String comentario = (String) payload.get("comentarioGeneral");
-                return new PreguntaAprobadaEvent(preguntaId, autorId, autorNombre, autorEmail, contexto, comentario, correlationId);
+                return new PreguntaAprobadaEvent(rawEventId, preguntaId, autorId, autorNombre, autorEmail, contexto, comentario, occurredOn, correlationId);
             }
             case PreguntaRechazadaEvent.EVENT_TYPE: {
                 Long preguntaId = getLong(payload, "preguntaId");
@@ -64,11 +80,32 @@ public class EventParser {
                         if (o != null) obs.add(o.toString());
                     }
                 }
-                return new PreguntaRechazadaEvent(preguntaId, autorId, autorNombre, autorEmail, contexto, obs, correlationId);
+                return new PreguntaRechazadaEvent(rawEventId, preguntaId, autorId, autorNombre, autorEmail, contexto, obs, occurredOn, correlationId);
             }
             default:
                 return null;
         }
+    }
+
+    private static LocalDateTime parseLocalDateTime(Object val) {
+        if (val instanceof String s && !s.isBlank()) {
+            try {
+                return LocalDateTime.parse(s);
+            } catch (Exception ignored) {}
+        }
+        if (val instanceof List<?> parts && parts.size() >= 5) {
+            try {
+                int y = ((Number) parts.get(0)).intValue();
+                int m = ((Number) parts.get(1)).intValue();
+                int d = ((Number) parts.get(2)).intValue();
+                int h = ((Number) parts.get(3)).intValue();
+                int min = ((Number) parts.get(4)).intValue();
+                int sec = parts.size() > 5 ? ((Number) parts.get(5)).intValue() : 0;
+                int nano = parts.size() > 6 ? ((Number) parts.get(6)).intValue() : 0;
+                return LocalDateTime.of(y, m, d, h, min, sec, nano);
+            } catch (Exception ignored) {}
+        }
+        return LocalDateTime.now();
     }
 
     private static Long getLong(Map<String, Object> map, String key) {

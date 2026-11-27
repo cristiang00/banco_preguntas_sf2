@@ -17,9 +17,8 @@ spring:
       hibernate:
         dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
 
-jwt:
-  secret: ${JWT_SECRET:SaberProSecretKey2026SuperSecureMustBeAtLeast256BitsLongForHMACSHA256}
-  expiration-ms: 86400000
+keycloak:
+  jwks-url: ${KEYCLOAK_JWKS_URI:http://localhost:8089/realms/saberpro/protocol/openid-connect/certs}
 
 springdoc:
   api-docs:

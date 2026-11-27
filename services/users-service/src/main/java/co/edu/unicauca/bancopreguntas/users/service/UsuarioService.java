@@ -1,12 +1,10 @@
 package co.edu.unicauca.bancopreguntas.users.service;
 
-import co.edu.unicauca.bancopreguntas.contracts.dto.TokenResponseDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.UserSummaryDTO;
 import co.edu.unicauca.bancopreguntas.users.domain.EstadoUsuario;
 import co.edu.unicauca.bancopreguntas.users.domain.Rol;
 import co.edu.unicauca.bancopreguntas.users.domain.UsuarioEntity;
 import co.edu.unicauca.bancopreguntas.users.repository.UsuarioRepository;
-import co.edu.unicauca.bancopreguntas.users.security.JwtUtil;
 import co.edu.unicauca.bancopreguntas.users.security.PasswordHasher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,41 +14,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de gestión de usuarios y roles (HU7: la autenticación y emisión de JWT
+ * se delega por completo a Keycloak como proveedor de identidad autoritativo).
+ */
 @Service
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordHasher passwordHasher;
-    private final JwtUtil jwtUtil;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, PasswordHasher passwordHasher, JwtUtil jwtUtil) {
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordHasher passwordHasher) {
         this.usuarioRepository = usuarioRepository;
         this.passwordHasher = passwordHasher;
-        this.jwtUtil = jwtUtil;
-    }
-
-    @Transactional(readOnly = true)
-    public TokenResponseDTO autenticar(String username, String password) {
-        if (username == null || username.isBlank() || password == null || password.isBlank()) {
-            throw new IllegalArgumentException("Usuario y contraseña son requeridos");
-        }
-
-        UsuarioEntity usuario = usuarioRepository.findByNombreUsuarioIgnoreCase(username.trim())
-                .orElseThrow(() -> new IllegalArgumentException("Credenciales inválidas"));
-
-        if (usuario.getEstado() != EstadoUsuario.ACTIVO) {
-            throw new IllegalStateException("El usuario está inactivo o bloqueado");
-        }
-
-        boolean passwordValido = passwordHasher.verify(password, usuario.getPasswordHash());
-        if (!passwordValido) {
-            throw new IllegalArgumentException("Credenciales inválidas");
-        }
-
-        String roleStr = usuario.getRol().name();
-        String token = jwtUtil.generateToken(usuario.getId(), usuario.getNombreUsuario(), usuario.getNombreCompleto(), roleStr);
-
-        return new TokenResponseDTO(token, usuario.getId(), usuario.getNombreUsuario(), usuario.getNombreCompleto(), roleStr);
     }
 
     @Transactional(readOnly = true)
@@ -78,11 +54,17 @@ public class UsuarioService {
 
     @Transactional
     public UserSummaryDTO registrar(String username, String fullName, String email, String password, Rol rol) {
-        if (usuarioRepository.findByNombreUsuarioIgnoreCase(username).isPresent()) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("El nombre de usuario es obligatorio");
+        }
+        if (rol == null) {
+            throw new IllegalArgumentException("El rol de usuario es obligatorio");
+        }
+        if (usuarioRepository.findByNombreUsuarioIgnoreCase(username.trim()).isPresent()) {
             throw new IllegalArgumentException("El nombre de usuario ya está registrado");
         }
-        String hash = passwordHasher.hash(password);
-        UsuarioEntity entity = new UsuarioEntity(null, username, fullName, email, rol, EstadoUsuario.ACTIVO, hash, LocalDateTime.now());
+        String hash = passwordHasher.hash(password != null ? password : "");
+        UsuarioEntity entity = new UsuarioEntity(null, username.trim(), fullName, email, rol, EstadoUsuario.ACTIVO, hash, LocalDateTime.now());
         UsuarioEntity saved = usuarioRepository.save(entity);
         return toDTO(saved);
     }
@@ -91,4 +73,3 @@ public class UsuarioService {
         return new UserSummaryDTO(u.getId(), u.getNombreUsuario(), u.getNombreCompleto(), u.getRol().name(), u.getEstado().name(), u.getEmail());
     }
 }
-

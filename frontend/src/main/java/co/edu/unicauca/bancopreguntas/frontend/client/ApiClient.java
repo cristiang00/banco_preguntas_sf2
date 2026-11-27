@@ -51,7 +51,14 @@ public class ApiClient {
     }
 
     public ApiClient(String baseUrl, String keycloakTokenUrl) {
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String normalized = baseUrl != null ? baseUrl.trim() : DEFAULT_GATEWAY_URL;
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (!normalized.endsWith("/api/v1")) {
+            normalized = normalized + "/api/v1";
+        }
+        this.baseUrl = normalized;
         this.keycloakTokenUrl = keycloakTokenUrl;
         this.objectMapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -83,39 +90,21 @@ public class ApiClient {
     }
 
     // =========================================================================
-    // Métodos de Autenticación (HU7 - Keycloak con fallback)
+    // Métodos de Autenticación (HU7 - Keycloak OIDC Direct Access Grants)
     // =========================================================================
 
     public TokenResponseDTO login(String username, String password) throws IOException, ApiException {
-        // HU7.S2: Intentar autenticación directa contra Keycloak (Direct Access Grants)
-        try {
-            TokenResponseDTO kcToken = loginWithKeycloak(username, password);
-            if (kcToken != null) {
-                this.token = kcToken.getToken();
-                this.currentUser = kcToken;
-                return kcToken;
-            }
-        } catch (ApiException e) {
-            // Si Keycloak respondió rechazo por credenciales, propagar la excepción
-            if (e.getStatusCode() == 400 || e.getStatusCode() == 401 || e.getStatusCode() == 403) {
-                throw e;
-            }
-        } catch (Exception ignored) {
-            // Fallback si Keycloak no está levantado en entornos de prueba locales
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
+            throw new ApiException(401, "Usuario y contraseña son requeridos");
         }
-
-        LoginRequestDTO request = new LoginRequestDTO(username, password);
-        String json = objectMapper.writeValueAsString(request);
-
-        HttpResponseData response = sendPost("/auth/login", json, false);
-        if (response.getStatusCode() == 200) {
-            TokenResponseDTO tokenResponse = objectMapper.readValue(response.getBody(), TokenResponseDTO.class);
-            this.token = tokenResponse.getToken();
-            this.currentUser = tokenResponse;
-            return tokenResponse;
-        } else {
-            throw handleApiError(response);
+        // HU7.S2: Autenticación exclusiva contra el endpoint de token de Keycloak
+        TokenResponseDTO kcToken = loginWithKeycloak(username, password);
+        if (kcToken != null) {
+            this.token = kcToken.getToken();
+            this.currentUser = kcToken;
+            return kcToken;
         }
+        throw new ApiException(401, "No se pudo obtener un token JWT válido desde Keycloak");
     }
 
     public TokenResponseDTO loginWithKeycloak(String username, String password) throws IOException, ApiException {
@@ -128,9 +117,14 @@ public class ApiClient {
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("Accept", "application/json");
 
+        String clientId = System.getProperty("keycloak.client.id",
+                System.getenv().getOrDefault("KEYCLOAK_CLIENT_ID", "gateway-client"));
+        String clientSecret = System.getProperty("keycloak.client.secret",
+                System.getenv().getOrDefault("KEYCLOAK_CLIENT_SECRET", "saberpro-client-secret-2026"));
+
         String formBody = "grant_type=password"
-                + "&client_id=gateway-client"
-                + "&client_secret=saberpro-client-secret-2026"
+                + "&client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+                + "&client_secret=" + URLEncoder.encode(clientSecret, StandardCharsets.UTF_8)
                 + "&username=" + URLEncoder.encode(username, StandardCharsets.UTF_8)
                 + "&password=" + URLEncoder.encode(password, StandardCharsets.UTF_8);
 
@@ -148,10 +142,13 @@ public class ApiClient {
             if (accessToken != null) {
                 return parseKeycloakToken(accessToken, username);
             }
+            throw new ApiException(401, "Keycloak no retornó un access_token válido");
         } else if (code == 400 || code == 401) {
-            throw new ApiException(code, "Credenciales inválidas en Keycloak");
+            throw new ApiException(401, "Credenciales inválidas en Keycloak");
+        } else if (code == 403) {
+            throw new ApiException(403, "Acceso denegado por Keycloak");
         }
-        return null;
+        throw new ApiException(code, "Error autenticando contra Keycloak (HTTP " + code + ")");
     }
 
     private TokenResponseDTO parseKeycloakToken(String token, String fallbackUsername) {
@@ -172,11 +169,22 @@ public class ApiClient {
                         }
                     }
                 }
-                Long userId = 2L;
-                if ("admin".equalsIgnoreCase(username)) userId = 1L;
-                else if ("autor1".equalsIgnoreCase(username)) userId = 2L;
-                else if ("revisor1".equalsIgnoreCase(username)) userId = 4L;
-                else if ("revisor2".equalsIgnoreCase(username)) userId = 5L;
+                Long userId = null;
+                if (payload.has("userId") && !payload.get("userId").isNull()) {
+                    if (payload.get("userId").isNumber()) {
+                        userId = payload.get("userId").asLong();
+                    } else {
+                        try { userId = Long.parseLong(payload.get("userId").asText().trim()); } catch (NumberFormatException ignored) {}
+                    }
+                }
+                if (userId == null) {
+                    if ("admin".equalsIgnoreCase(username)) userId = 1L;
+                    else if ("autor1".equalsIgnoreCase(username)) userId = 2L;
+                    else if ("juan12".equalsIgnoreCase(username)) userId = 3L;
+                    else if ("revisor1".equalsIgnoreCase(username)) userId = 4L;
+                    else if ("revisor2".equalsIgnoreCase(username)) userId = 5L;
+                    else userId = (long) Math.abs(username.hashCode() % 10000);
+                }
 
                 String nombreCompleto = payload.has("name") ? payload.get("name").asText() : username;
                 return new TokenResponseDTO(token, userId, username, nombreCompleto, role);
@@ -207,11 +215,18 @@ public class ApiClient {
         throw handleApiError(response);
     }
 
+    @SuppressWarnings("unchecked")
     public List<PreguntaDTO> listarPreguntas(String estado, String dificultad, int page, int size)
+            throws IOException, ApiException {
+        Map<String, Object> pageData = listarPreguntasPaginado(estado, dificultad, page, size);
+        return (List<PreguntaDTO>) pageData.getOrDefault("content", Collections.emptyList());
+    }
+
+    public Map<String, Object> listarPreguntasPaginado(String estado, String dificultad, int page, int size)
             throws IOException, ApiException {
         StringBuilder query = new StringBuilder("?page=").append(page).append("&size=").append(size);
         if (estado != null && !estado.isBlank() && !"TODOS".equalsIgnoreCase(estado)) {
-            query.append("&estado=").append(URLEncoder.encode(estado, StandardCharsets.UTF_8));
+            query.append("&estados=").append(URLEncoder.encode(estado, StandardCharsets.UTF_8));
         }
         if (dificultad != null && !dificultad.isBlank() && !"TODOS".equalsIgnoreCase(dificultad)) {
             query.append("&dificultad=").append(URLEncoder.encode(dificultad, StandardCharsets.UTF_8));
@@ -219,14 +234,23 @@ public class ApiClient {
 
         HttpResponseData response = sendGet("/preguntas" + query, true);
         if (response.getStatusCode() == 200) {
-            // El backend devuelve objeto paginado: { "content": [...], "totalPages": N, ... }
             com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            Map<String, Object> result = new LinkedHashMap<>();
             if (root.has("content")) {
-                return objectMapper.readValue(root.get("content").toString(),
+                List<PreguntaDTO> items = objectMapper.readValue(root.get("content").toString(),
                         new TypeReference<List<PreguntaDTO>>() {});
+                result.put("content", items);
+                result.put("totalPages", root.has("totalPages") ? root.get("totalPages").asInt(1) : 1);
+                result.put("totalElements", root.has("totalElements") ? root.get("totalElements").asLong(items.size()) : (long) items.size());
+                result.put("currentPage", root.has("currentPage") ? root.get("currentPage").asInt(page) : page);
+                return result;
             }
-            // Fallback: si ya es un array directo
-            return objectMapper.readValue(response.getBody(), new TypeReference<List<PreguntaDTO>>() {});
+            List<PreguntaDTO> items = objectMapper.readValue(response.getBody(), new TypeReference<List<PreguntaDTO>>() {});
+            result.put("content", items);
+            result.put("totalPages", 1);
+            result.put("totalElements", (long) items.size());
+            result.put("currentPage", page);
+            return result;
         }
         throw handleApiError(response);
     }
@@ -249,14 +273,6 @@ public class ApiClient {
                     nuevoEstado = EstadoPreguntaDTO.fromString(root.get("estado").asText());
                 }
             } catch (Exception ignored) {}
-
-            // SSCRUM-HU4: Sincronizar proyección de estado en questions-service
-            // para que la pregunta aparezca en la lista de pendientes del administrador
-            try {
-                sendPut("/preguntas/" + id + "/proyeccion-estado?estado=" + nuevoEstado.name(), "{}", true);
-            } catch (Exception ignored) {
-                // Best-effort: si falla la sincronización, el estado ya cambió en lifecycle
-            }
 
             return nuevoEstado;
         }
@@ -313,7 +329,14 @@ public class ApiClient {
         return listarRevisionesAsignadas(0, 50, null, null, null);
     }
 
+    @SuppressWarnings("unchecked")
     public List<RevisionItemDTO> listarRevisionesAsignadas(int page, int size, String estado, String dificultad, String competencia)
+            throws IOException, ApiException {
+        Map<String, Object> pageData = listarRevisionesAsignadasPaginado(page, size, estado, dificultad, competencia);
+        return (List<RevisionItemDTO>) pageData.getOrDefault("content", Collections.emptyList());
+    }
+
+    public Map<String, Object> listarRevisionesAsignadasPaginado(int page, int size, String estado, String dificultad, String competencia)
             throws IOException, ApiException {
         StringBuilder sb = new StringBuilder("/revisiones/asignadas?page=").append(page).append("&size=").append(size);
         if (estado != null && !estado.isBlank() && !"Todos".equalsIgnoreCase(estado)) {
@@ -328,11 +351,22 @@ public class ApiClient {
         HttpResponseData response = sendGet(sb.toString(), true);
         if (response.getStatusCode() == 200) {
             com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            Map<String, Object> result = new LinkedHashMap<>();
             if (root.has("content")) {
-                return objectMapper.readValue(root.get("content").toString(),
+                List<RevisionItemDTO> items = objectMapper.readValue(root.get("content").toString(),
                         new TypeReference<List<RevisionItemDTO>>() {});
+                result.put("content", items);
+                result.put("totalPages", root.has("totalPages") ? root.get("totalPages").asInt(1) : 1);
+                result.put("totalElements", root.has("totalElements") ? root.get("totalElements").asLong(items.size()) : (long) items.size());
+                result.put("currentPage", root.has("currentPage") ? root.get("currentPage").asInt(page) : page);
+                return result;
             }
-            return objectMapper.readValue(response.getBody(), new TypeReference<List<RevisionItemDTO>>() {});
+            List<RevisionItemDTO> items = objectMapper.readValue(response.getBody(), new TypeReference<List<RevisionItemDTO>>() {});
+            result.put("content", items);
+            result.put("totalPages", 1);
+            result.put("totalElements", (long) items.size());
+            result.put("currentPage", page);
+            return result;
         }
         throw handleApiError(response);
     }
@@ -349,6 +383,20 @@ public class ApiClient {
             return objectMapper.readValue(response.getBody(), new TypeReference<List<RevisionItemDTO>>() {});
         }
         throw handleApiError(response);
+    }
+
+    public void registrarEvaluacion(Long revisionId, String criterio, Double calificacion, String comentario, List<String> observaciones)
+            throws IOException, ApiException {
+        EvaluacionRequestDTO req = new EvaluacionRequestDTO();
+        req.setCriterio(criterio);
+        req.setCalificacion(calificacion);
+        req.setComentario(comentario);
+        req.setObservaciones(observaciones != null ? observaciones : Collections.emptyList());
+        String json = objectMapper.writeValueAsString(req);
+        HttpResponseData response = sendPost("/revisiones/" + revisionId + "/evaluacion", json, true);
+        if (response.getStatusCode() != 200 && response.getStatusCode() != 201) {
+            throw handleApiError(response);
+        }
     }
 
     public void emitirDecision(Long revisionId, String decision, String observaciones)
@@ -375,7 +423,18 @@ public class ApiClient {
     public List<String> obtenerObservaciones(Long preguntaId) throws IOException, ApiException {
         HttpResponseData response = sendGet("/revisiones/pregunta/" + preguntaId + "/observaciones", true);
         if (response.getStatusCode() == 200) {
-            return objectMapper.readValue(response.getBody(), new TypeReference<List<String>>() {});
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(response.getBody());
+            if (root != null && root.isArray()) {
+                List<String> observaciones = new ArrayList<>();
+                for (com.fasterxml.jackson.databind.JsonNode item : root) {
+                    if (item.isTextual()) {
+                        observaciones.add(item.asText());
+                    } else if (item.has("texto") && !item.get("texto").isNull()) {
+                        observaciones.add(item.get("texto").asText());
+                    }
+                }
+                return observaciones;
+            }
         }
         return Collections.emptyList();
     }

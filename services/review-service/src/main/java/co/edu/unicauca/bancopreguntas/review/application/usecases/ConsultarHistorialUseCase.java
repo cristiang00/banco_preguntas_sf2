@@ -3,6 +3,7 @@ package co.edu.unicauca.bancopreguntas.review.application.usecases;
 import co.edu.unicauca.bancopreguntas.contracts.dto.PreguntaDTO;
 import co.edu.unicauca.bancopreguntas.review.application.ports.output.PreguntasClientPort;
 import co.edu.unicauca.bancopreguntas.review.application.ports.output.RevisionRepositoryPort;
+import co.edu.unicauca.bancopreguntas.review.domain.model.Evaluacion;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Observacion;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Revision;
 
@@ -43,6 +44,7 @@ public class ConsultarHistorialUseCase {
         for (Revision rev : todasRevisiones) {
             Map<String, Object> ronda = new LinkedHashMap<>();
             ronda.put("revisionId", rev.getId());
+            ronda.put("ronda", rev.getRonda());
             ronda.put("revisorId", rev.getRevisorId());
             ronda.put("revisorNombre", rev.getRevisorNombre());
             ronda.put("estado", rev.getEstado().name());
@@ -53,15 +55,38 @@ public class ConsultarHistorialUseCase {
             List<String> textoObs = obs.stream().map(Observacion::getTexto).collect(Collectors.toList());
             ronda.put("observaciones", textoObs);
 
+            // HU6: Incluir evaluaciones (criterio, calificación, comentario) por revisión
+            List<Evaluacion> evals = repositoryPort.findEvaluacionesByRevisionId(rev.getId());
+            List<Map<String, Object>> evaluacionesList = evals.stream().map(ev -> {
+                Map<String, Object> evMap = new LinkedHashMap<>();
+                evMap.put("criterio", ev.getCriterio());
+                evMap.put("calificacion", ev.getCalificacion());
+                evMap.put("comentario", ev.getComentario());
+                evMap.put("fechaEvaluacion", ev.getFechaEvaluacion());
+                return evMap;
+            }).collect(Collectors.toList());
+            ronda.put("evaluaciones", evaluacionesList);
+
             rondas.add(ronda);
         }
 
-        // Ordenar por fecha cronológica inversa (más reciente primero)
+        // Ordenar por ronda inversa, luego fecha cronológica inversa y finalmente revisionId inverso
         rondas.sort((a, b) -> {
+            Integer r1 = (Integer) a.getOrDefault("ronda", 1);
+            Integer r2 = (Integer) b.getOrDefault("ronda", 1);
+            int cmpRonda = Integer.compare(r2 != null ? r2 : 1, r1 != null ? r1 : 1);
+            if (cmpRonda != 0) return cmpRonda;
+
             java.time.LocalDateTime f1 = (java.time.LocalDateTime) a.get("fechaAsignacion");
             java.time.LocalDateTime f2 = (java.time.LocalDateTime) b.get("fechaAsignacion");
-            if (f1 == null || f2 == null) return 0;
-            return f2.compareTo(f1);
+            if (f1 != null && f2 != null) {
+                int cmpFecha = f2.compareTo(f1);
+                if (cmpFecha != 0) return cmpFecha;
+            }
+            Long id1 = (Long) a.get("revisionId");
+            Long id2 = (Long) b.get("revisionId");
+            if (id1 != null && id2 != null) return Long.compare(id2, id1);
+            return 0;
         });
 
         // Paginación manual de la lista agrupada

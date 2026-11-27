@@ -19,11 +19,14 @@ spring:
 
 services:
   users:
-    url: ${USERS_SERVICE_URL:http://localhost:8081}
+    url: ${SERVICES_USERS_URL:${USERS_SERVICE_URL:http://localhost:8081}}
   questions:
-    url: ${QUESTIONS_SERVICE_URL:http://localhost:8082}
+    url: ${SERVICES_QUESTIONS_URL:${QUESTIONS_SERVICE_URL:http://localhost:8082}}
   lifecycle:
-    url: ${LIFECYCLE_SERVICE_URL:http://localhost:8084}
+    url: ${SERVICES_LIFECYCLE_URL:${LIFECYCLE_SERVICE_URL:http://localhost:8084}}
+
+keycloak:
+  jwks-url: ${KEYCLOAK_JWKS_URI:http://localhost:8089/realms/saberpro/protocol/openid-connect/certs}
 
 springdoc:
   api-docs:
@@ -31,9 +34,10 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-
-
 management:
+  health:
+    rabbit:
+      enabled: ${RABBIT_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:

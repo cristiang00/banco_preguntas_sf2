@@ -2,8 +2,7 @@ package co.edu.unicauca.bancopreguntas.gateway.proxy;
 
 import co.edu.unicauca.bancopreguntas.gateway.config.GatewayProperties;
 import co.edu.unicauca.bancopreguntas.gateway.filter.CorrelationFilter;
-import co.edu.unicauca.bancopreguntas.gateway.security.JwtValidator;
-import io.jsonwebtoken.Claims;
+import co.edu.unicauca.bancopreguntas.gateway.security.KeycloakJwtExtractor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -11,8 +10,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
@@ -26,7 +29,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "API Gateway", description = "Enrutamiento centralizado, verificación de tokens Keycloak/JWT, roles, correlación y timeouts (HU7)")
+@Tag(name = "API Gateway", description = "Enrutamiento centralizado con Spring Security Resource Server (Keycloak JWKS), roles, correlación y timeouts (HU7)")
 public class GatewayRoutingController {
 
     private static final Logger log = LoggerFactory.getLogger(GatewayRoutingController.class);
@@ -45,13 +48,13 @@ public class GatewayRoutingController {
     );
 
     private final GatewayProperties gatewayProperties;
-    private final JwtValidator jwtValidator;
+    private final KeycloakJwtExtractor jwtExtractor;
     private final RestTemplate restTemplate;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public GatewayRoutingController(GatewayProperties gatewayProperties, JwtValidator jwtValidator) {
+    @Autowired
+    public GatewayRoutingController(GatewayProperties gatewayProperties, KeycloakJwtExtractor jwtExtractor) {
         this.gatewayProperties = gatewayProperties;
-        this.jwtValidator = jwtValidator;
+        this.jwtExtractor = jwtExtractor;
 
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
@@ -64,14 +67,16 @@ public class GatewayRoutingController {
     }
 
     // Constructor para inyección de RestTemplate en pruebas
-    public GatewayRoutingController(GatewayProperties gatewayProperties, JwtValidator jwtValidator, RestTemplate restTemplate) {
+    public GatewayRoutingController(GatewayProperties gatewayProperties,
+                                    KeycloakJwtExtractor jwtExtractor,
+                                    RestTemplate restTemplate) {
         this.gatewayProperties = gatewayProperties;
-        this.jwtValidator = jwtValidator;
+        this.jwtExtractor = jwtExtractor;
         this.restTemplate = restTemplate;
     }
 
     @RequestMapping(value = "/**")
-    @Operation(summary = "Proxy inverso centralizado", description = "Enruta solicitudes a los microservicios con validación JWT contra Keycloak, propagación de identidad y correlación")
+    @Operation(summary = "Proxy inverso centralizado", description = "Enruta solicitudes a los microservicios propagando el JWT verificado de Keycloak, identidad verificada y correlación")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Petición procesada exitosamente por el microservicio"),
         @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado"),
@@ -85,7 +90,6 @@ public class GatewayRoutingController {
             @RequestBody(required = false) byte[] body) {
 
         String path = request.getRequestURI();
-        // Quitar prefijo /api/v1
         String subPath = path.startsWith("/api/v1") ? path.substring(7) : path;
         String query = request.getQueryString();
 
@@ -104,59 +108,41 @@ public class GatewayRoutingController {
                     .body(Map.of("error", "Ruta no encontrada en API Gateway", "path", path));
         }
 
-        // 2. Comprobar si requiere autenticación
-        boolean isPublic = isPublicEndpoint(subPath, method);
-        Claims claims = null;
+        // 2. Obtener JWT verificado por Spring Security Resource Server
+        Jwt verifiedJwt = extractVerifiedJwt();
 
-        if (!isPublic) {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Token de autorización ausente o inválido"));
-            }
-            try {
-                claims = jwtValidator.validateAndExtractClaims(authHeader);
-            } catch (Exception e) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Token JWT expirado o inválido: " + e.getMessage()));
-            }
-
-            // 3. Control inicial de roles en el Gateway (HU7.S4)
-            ResponseEntity<?> roleCheck = checkRoleAuthorization(subPath, method, claims);
-            if (roleCheck != null) {
-                return roleCheck;
-            }
-        }
-
-        // 4. Preparar cabeceras para el microservicio de destino (HU7.S5.2: ignorar cabeceras x-user- no verificadas)
+        // 3. Preparar cabeceras hacia el microservicio (HU7.S5.2: eliminar cabeceras X-User-* inyectadas por el cliente)
         HttpHeaders headers = new HttpHeaders();
         Enumeration<String> headerNames = request.getHeaderNames();
         if (headerNames != null) {
             while (headerNames.hasMoreElements()) {
                 String name = headerNames.nextElement();
                 String lowerName = name.toLowerCase();
-                // Filtrar cabeceras Hop-by-Hop y cabeceras de identidad inyectadas por el cliente
                 if (!HOP_BY_HOP_HEADERS.contains(lowerName) && !lowerName.startsWith("x-user-")) {
                     headers.addAll(name, Collections.list(request.getHeaders(name)));
                 }
             }
         }
 
-        // Inyectar o propagar cabeceras de contexto seguras extraídas de claims verificados
+        // Propagar trazabilidad e identidad derivada exclusivamente del JWT verificado
         headers.set(CorrelationFilter.CORRELATION_HEADER, correlationId);
-        if (claims != null) {
-            Long userId = jwtValidator.extractUserId(claims);
-            String role = jwtValidator.extractRole(claims);
-            String username = jwtValidator.extractUsername(claims);
+        if (verifiedJwt != null) {
+            Long userId = jwtExtractor.extractUserId(verifiedJwt);
+            String role = jwtExtractor.extractRole(verifiedJwt);
+            String username = jwtExtractor.extractUsername(verifiedJwt);
             if (userId != null) headers.set("X-User-Id", String.valueOf(userId));
             if (role != null) headers.set("X-User-Role", role);
             if (username != null) headers.set("X-User-Name", username);
+            // Asegurar propagación del Bearer Token verificado hacia el microservicio Resource Server
+            if (!headers.containsKey(HttpHeaders.AUTHORIZATION) && verifiedJwt.getTokenValue() != null) {
+                headers.setBearerAuth(verifiedJwt.getTokenValue());
+            }
         }
 
-        // 5. Construir URI de destino segura
+        // 4. Construir URI de destino
         URI targetUri;
         try {
-            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(targetServiceBaseUrl).path(subPath);
+            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(targetServiceBaseUrl).path(subPath);
             if (query != null && !query.isBlank()) {
                 builder.query(query);
             }
@@ -218,11 +204,19 @@ public class GatewayRoutingController {
         }
     }
 
+    private Jwt extractVerifiedJwt() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+            return jwt;
+        }
+        return null;
+    }
+
     public String resolveTargetService(String subPath) {
         // HU2: Envío de pregunta a revisión pertenece a Lifecycle Service
         if (subPath.startsWith("/preguntas/") && subPath.contains("/enviar-revision")) {
             return gatewayProperties.getLifecycle();
-        } else if (subPath.startsWith("/auth") || subPath.startsWith("/usuarios")) {
+        } else if (subPath.startsWith("/usuarios")) {
             return gatewayProperties.getUsers();
         } else if (subPath.startsWith("/preguntas") || subPath.startsWith("/catalogos")) {
             return gatewayProperties.getQuestions();
@@ -238,89 +232,5 @@ public class GatewayRoutingController {
             return gatewayProperties.getAudit();
         }
         return null;
-    }
-
-    private boolean isPublicEndpoint(String subPath, HttpMethod method) {
-        // Las solicitudes de preflight CORS (OPTIONS) deben permitirse siempre sin token
-        if (method == HttpMethod.OPTIONS) {
-            return true;
-        }
-        if (subPath.startsWith("/auth/login") || subPath.startsWith("/auth/token")) {
-            return true;
-        }
-        if (subPath.startsWith("/catalogos") && method == HttpMethod.GET) {
-            return true;
-        }
-        return false;
-    }
-
-    private ResponseEntity<?> checkRoleAuthorization(String subPath, HttpMethod method, Claims claims) {
-        String role = jwtValidator.extractRole(claims);
-        if (role == null) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Rol de usuario no identificado o sin permisos asignados"));
-        }
-
-        // HU4: Asignación de revisores y consulta de preguntas pendientes de asignación -> Solo ADMINISTRADOR
-        if (subPath.startsWith("/revisiones/asignar") || 
-            subPath.startsWith("/revisiones/pendientes") || 
-            subPath.equals("/preguntas/pendientes") || 
-            subPath.startsWith("/preguntas/pendientes?")) {
-            if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Acceso denegado: solo ADMINISTRADOR puede gestionar asignaciones"));
-            }
-        }
-
-        // Registro de nuevos usuarios -> Solo ADMINISTRADOR
-        if (subPath.startsWith("/usuarios") && method == HttpMethod.POST) {
-            if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Acceso denegado: solo ADMINISTRADOR puede registrar nuevos usuarios"));
-            }
-        }
-
-        // HU5: Evaluaciones y decisiones de revisión -> Solo REVISOR
-        if (subPath.startsWith("/revisiones/asignadas") || 
-            (subPath.startsWith("/revisiones/") && (subPath.contains("/evaluacion") || subPath.contains("/decision")))) {
-            if (!"REVISOR".equalsIgnoreCase(role)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Acceso denegado: solo REVISOR puede emitir evaluaciones o decisiones"));
-            }
-        }
-
-        // HU6: Historial de revisiones -> Solo AUTOR o ADMINISTRADOR
-        if (subPath.startsWith("/revisiones/pregunta/") && subPath.contains("/historial")) {
-            if (!"AUTOR".equalsIgnoreCase(role) && !"ADMINISTRADOR".equalsIgnoreCase(role)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Acceso denegado: solo el AUTOR de la pregunta o ADMINISTRADOR pueden consultar el historial"));
-            }
-        }
-
-        // Control para evitar auto-aprobación o alteración directa en Ciclo de Vida
-        if (subPath.startsWith("/ciclo-vida") && (subPath.contains("/decision") || subPath.contains("/inicializar"))) {
-            if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Acceso denegado: endpoint de sincronización interna"));
-            }
-        }
-
-        // Auditoría global -> Solo ADMINISTRADOR
-        if (subPath.startsWith("/auditoria")) {
-            if (!"ADMINISTRADOR".equalsIgnoreCase(role)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Acceso denegado: solo ADMINISTRADOR puede consultar auditoría global"));
-            }
-        }
-
-        // Creación y edición de preguntas o envío a revisión -> Solo AUTOR (o Administrador)
-        if (subPath.startsWith("/preguntas") && (method == HttpMethod.POST || method == HttpMethod.PUT)) {
-            if (!"AUTOR".equalsIgnoreCase(role) && !"ADMINISTRADOR".equalsIgnoreCase(role)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Acceso denegado: rol insuficiente para crear o modificar preguntas"));
-            }
-        }
-
-        return null; // Autorizado
     }
 }

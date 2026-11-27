@@ -7,10 +7,10 @@ import co.edu.unicauca.bancopreguntas.contracts.events.RevisoresAsignadosEvent;
 import co.edu.unicauca.bancopreguntas.review.client.LifecycleServiceClient;
 import co.edu.unicauca.bancopreguntas.review.client.QuestionsServiceClient;
 import co.edu.unicauca.bancopreguntas.review.client.UsersServiceClient;
-import co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision;
-import co.edu.unicauca.bancopreguntas.review.domain.EvaluacionRevisorEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.ObservacionEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.RevisionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EvaluacionRevisorEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.ObservacionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.RevisionEntity;
 import co.edu.unicauca.bancopreguntas.review.messaging.ReviewEventPublisher;
 import co.edu.unicauca.bancopreguntas.review.repository.EvaluacionRevisorRepository;
 import co.edu.unicauca.bancopreguntas.review.repository.ObservacionRepository;
@@ -80,7 +80,16 @@ public class ReviewService {
                     "Solo las preguntas en estado Pendiente de revisión pueden tener revisores asignados");
         }
 
-        // Validar revisores en Users Service
+        // Validar revisores en Users Service y determinar ronda activa sin sobrescribir rondas finalizadas
+        List<RevisionEntity> previas = revisionRepository.findByPreguntaId(preguntaId);
+        int versionPregunta = (pregunta.getVersion() != null && pregunta.getVersion() >= 1) ? pregunta.getVersion() : 1;
+        int maxRondaFinalizada = previas.stream()
+                .filter(r -> r.getEstado() != null && r.getEstado().estaFinalizada())
+                .mapToInt(RevisionEntity::getRonda)
+                .max()
+                .orElse(0);
+        int rondaActual = Math.max(versionPregunta, maxRondaFinalizada + 1);
+
         List<RevisoresAsignadosEvent.RevisorInfo> revisoresInfo = new ArrayList<>();
         List<RevisionEntity> asignacionesCreadas = new ArrayList<>();
 
@@ -98,11 +107,11 @@ public class ReviewService {
                 throw new IllegalArgumentException("El revisor " + user.getNombreUsuario() + " está inactivo");
             }
 
-            // Prevenir asignaciones duplicadas o reactivar si ya existía previamente
-            Optional<RevisionEntity> existente = revisionRepository.findByPreguntaIdAndRevisorId(preguntaId, revId);
+            // Prevenir asignaciones duplicadas dentro de la misma ronda activa
+            Optional<RevisionEntity> existente = revisionRepository.findByPreguntaIdAndRevisorIdAndRonda(preguntaId, revId, rondaActual);
             if (existente.isEmpty()) {
                 RevisionEntity rev = new RevisionEntity(preguntaId, revId, user.getNombreCompleto(), user.getEmail(),
-                        pregunta.getCompetencia(), pregunta.getNivelDificultad());
+                        pregunta.getCompetencia(), pregunta.getNivelDificultad(), rondaActual);
                 RevisionEntity guardada = revisionRepository.save(rev);
                 asignacionesCreadas.add(guardada);
             } else {
@@ -283,8 +292,11 @@ public class ReviewService {
             revisionRepository.save(rev);
 
             // Política de rechazo: Si un revisor rechaza con motivo, la pregunta pasa a Rechazada
-            // Cerrar las demás revisiones pendientes
-            List<RevisionEntity> todasRevisiones = revisionRepository.findByPreguntaId(preguntaId);
+            // Cerrar las demás revisiones pendientes de la ronda actual
+            int rondaActual = rev.getRonda();
+            List<RevisionEntity> todasRevisiones = revisionRepository.findByPreguntaId(preguntaId).stream()
+                    .filter(r -> r.getRonda() == rondaActual)
+                    .collect(Collectors.toList());
             for (RevisionEntity otra : todasRevisiones) {
                 if (!otra.getId().equals(revisionId) && !otra.getEstado().estaFinalizada()) {
                     otra.setEstado(EstadoRevision.CERRADA_POR_RECHAZO);
@@ -315,9 +327,13 @@ public class ReviewService {
             rev.setFechaDecision(LocalDateTime.now());
             revisionRepository.save(rev);
 
-            // Política de aprobación: Todos los revisores asignados deben haber aprobado
-            List<RevisionEntity> todasRevisiones = revisionRepository.findByPreguntaId(preguntaId);
-            boolean todosAprobaron = todasRevisiones.stream().allMatch(r -> r.getEstado() == EstadoRevision.APROBADA);
+            // Política de aprobación: Todos los revisores asignados en la ronda activa deben haber aprobado
+            int rondaActual = rev.getRonda();
+            List<RevisionEntity> revisionesRonda = revisionRepository.findByPreguntaId(preguntaId).stream()
+                    .filter(r -> r.getRonda() == rondaActual)
+                    .collect(Collectors.toList());
+            boolean todosAprobaron = !revisionesRonda.isEmpty()
+                    && revisionesRonda.stream().allMatch(r -> r.getEstado() == EstadoRevision.APROBADA);
 
             if (todosAprobaron) {
                 lifecycleClient.aplicarDecision(preguntaId, "APROBADA", revisorId, autorEmail,
@@ -343,5 +359,14 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public List<ObservacionEntity> listarObservaciones(Long preguntaId) {
         return observacionRepository.findByPreguntaIdAndVisibleAutorTrue(preguntaId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> listarEmailsRevisoresPorPregunta(Long preguntaId) {
+        return revisionRepository.findByPreguntaId(preguntaId).stream()
+                .map(RevisionEntity::getRevisorEmail)
+                .filter(e -> e != null && !e.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
     }
 }

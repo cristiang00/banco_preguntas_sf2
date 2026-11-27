@@ -2,6 +2,7 @@ package co.edu.unicauca.bancopreguntas.questions.client;
 
 import co.edu.unicauca.bancopreguntas.contracts.dto.PreguntaDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.ResultadoValidacionDTO;
+import co.edu.unicauca.bancopreguntas.questions.security.ResourceServerSecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,7 @@ public class ValidationServiceClient {
         factory.setConnectTimeout(2000);
         factory.setReadTimeout(3000);
         this.restTemplate = new RestTemplate(factory);
+        this.restTemplate.getInterceptors().add(ResourceServerSecurityConfig.bearerForwardingInterceptor());
         this.validationServiceUrl = validationServiceUrl;
     }
 

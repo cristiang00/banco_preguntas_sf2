@@ -101,7 +101,6 @@ public class MainDashboardFrame extends JFrame {
         } else if ("REVISOR".equals(role)) {
             RevisionesAsignadasPanel revisionesPanel = new RevisionesAsignadasPanel();
             tabbedPane.addTab("🔍 Mis Revisiones Asignadas", revisionesPanel);
-            tabbedPane.addTab("📋 Banco de Preguntas", listarPreguntasPanel);
             tabbedPane.addTab("🔔 Notificaciones", notificacionesPanel);
             revisionesPanel.cargarDatos();
 

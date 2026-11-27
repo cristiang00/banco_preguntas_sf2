@@ -1,11 +1,11 @@
-package co.edu.unicauca.bancopreguntas.review.domain;
+package co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "revisiones", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"pregunta_id", "revisor_id"})
+        @UniqueConstraint(columnNames = {"pregunta_id", "revisor_id", "ronda"})
 })
 public class RevisionEntity {
 
@@ -30,6 +30,9 @@ public class RevisionEntity {
 
     @Column(name = "nivel_dificultad", length = 50)
     private String nivelDificultad;
+
+    @Column(name = "ronda", nullable = false)
+    private Integer ronda = 1;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 50)
@@ -59,6 +62,12 @@ public class RevisionEntity {
         this.nivelDificultad = nivelDificultad;
     }
 
+    public RevisionEntity(Long preguntaId, Long revisorId, String revisorNombre, String revisorEmail,
+                          String competencia, String nivelDificultad, Integer ronda) {
+        this(preguntaId, revisorId, revisorNombre, revisorEmail, competencia, nivelDificultad);
+        this.ronda = (ronda != null && ronda >= 1) ? ronda : 1;
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -80,6 +89,9 @@ public class RevisionEntity {
     public String getNivelDificultad() { return nivelDificultad; }
     public void setNivelDificultad(String nivelDificultad) { this.nivelDificultad = nivelDificultad; }
 
+    public Integer getRonda() { return ronda != null ? ronda : 1; }
+    public void setRonda(Integer ronda) { this.ronda = (ronda != null && ronda >= 1) ? ronda : 1; }
+
     public EstadoRevision getEstado() { return estado; }
     public void setEstado(EstadoRevision estado) { this.estado = estado; }
 
@@ -89,3 +101,4 @@ public class RevisionEntity {
     public LocalDateTime getFechaDecision() { return fechaDecision; }
     public void setFechaDecision(LocalDateTime fechaDecision) { this.fechaDecision = fechaDecision; }
 }
+

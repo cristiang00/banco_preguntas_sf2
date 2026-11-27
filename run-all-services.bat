@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\Users\mixmi\OneDrive\Desktop\microServicios\banco_preguntas_sf2"
+cd /d "%~dp0"
 
 echo ==========================================================
 echo Iniciando los 8 Microservicios en ventanas de CMD...

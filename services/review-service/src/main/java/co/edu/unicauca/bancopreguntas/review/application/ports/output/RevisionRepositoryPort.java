@@ -22,6 +22,13 @@ public interface RevisionRepositoryPort {
 
     Optional<Revision> findByPreguntaIdAndRevisorId(Long preguntaId, Long revisorId);
 
+    default Optional<Revision> findByPreguntaIdAndRevisorIdAndRonda(Long preguntaId, Long revisorId, Integer ronda) {
+        int rTarget = (ronda != null && ronda >= 1) ? ronda : 1;
+        return findByPreguntaId(preguntaId).stream()
+                .filter(r -> r.getRevisorId().equals(revisorId) && r.getRonda() == rTarget)
+                .findFirst();
+    }
+
     Map<String, Object> findByRevisorIdWithFilters(Long revisorId, EstadoRevision estado,
                                                    String competencia, String dificultad,
                                                    int page, int size);
@@ -33,5 +40,7 @@ public interface RevisionRepositoryPort {
     List<Observacion> findObservacionesByRevisionId(Long revisionId);
 
     List<Observacion> findObservacionesByPreguntaId(Long preguntaId);
+
+    List<Evaluacion> findEvaluacionesByRevisionId(Long revisionId);
 }
 

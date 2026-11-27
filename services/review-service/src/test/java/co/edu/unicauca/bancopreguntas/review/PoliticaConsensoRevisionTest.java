@@ -34,6 +34,9 @@ class PoliticaConsensoRevisionTest {
         assertThrows(IllegalArgumentException.class, () -> politica.validarCantidadRevisores(Collections.emptyList()));
         assertThrows(IllegalArgumentException.class, () -> politica.validarCantidadRevisores(List.of(1L, 2L, 3L, 4L)));
 
+        // Lista con revisores duplicados en la misma solicitud debe fallar
+        assertThrows(IllegalArgumentException.class, () -> politica.validarCantidadRevisores(List.of(4L, 4L)));
+
         assertDoesNotThrow(() -> politica.validarCantidadRevisores(List.of(1L)));
         assertDoesNotThrow(() -> politica.validarCantidadRevisores(List.of(1L, 2L)));
         assertDoesNotThrow(() -> politica.validarCantidadRevisores(List.of(1L, 2L, 3L)));
@@ -103,6 +106,22 @@ class PoliticaConsensoRevisionTest {
         Evaluacion eval = new Evaluacion(null, 1L, "Claridad", 4.5, "Buena redacción", null);
         assertEquals("Claridad", eval.getCriterio());
         assertEquals(4.5, eval.getCalificacion());
+    }
+
+    @Test
+    @DisplayName("HU6 + HU5: Consenso en Ronda 2 evalúa solo la ronda activa e ignora rechazos de Ronda 1")
+    void testConsensoPorRondaActivaIgnoraRondasPrevias() {
+        Revision r1Rechazada = Revision.crearNueva(100L, 4L, "Revisor 1", "r1@test.com", "Lectura", "Medio", 1);
+        r1Rechazada.rechazar();
+
+        Revision r2RevA = Revision.crearNueva(100L, 5L, "Revisor 2", "r2@test.com", "Lectura", "Medio", 2);
+        Revision r2RevB = Revision.crearNueva(100L, 6L, "Revisor 3", "r3@test.com", "Lectura", "Medio", 2);
+
+        r2RevA.aprobar();
+        assertFalse(politica.determinarConsensoAprobacionRonda(List.of(r1Rechazada, r2RevA, r2RevB), 2));
+
+        r2RevB.aprobar();
+        assertTrue(politica.determinarConsensoAprobacionRonda(List.of(r1Rechazada, r2RevA, r2RevB), 2));
     }
 }
 

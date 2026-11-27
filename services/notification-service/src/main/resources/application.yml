@@ -27,13 +27,21 @@ notification:
     password: ${SMTP_PASS:}
     from: ${SMTP_FROM:notificaciones@unicauca.edu.co}
 
+keycloak:
+  jwks-url: ${KEYCLOAK_JWKS_URI:http://localhost:8089/realms/saberpro/protocol/openid-connect/certs}
+
 springdoc:
   api-docs:
-    path: /api-docs
+    path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
 
 management:
+  health:
+    rabbit:
+      enabled: ${RABBIT_HEALTH_ENABLED:false}
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:

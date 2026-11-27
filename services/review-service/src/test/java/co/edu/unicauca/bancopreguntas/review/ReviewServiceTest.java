@@ -12,10 +12,10 @@ import co.edu.unicauca.bancopreguntas.contracts.events.RevisoresAsignadosEvent;
 import co.edu.unicauca.bancopreguntas.review.client.LifecycleServiceClient;
 import co.edu.unicauca.bancopreguntas.review.client.QuestionsServiceClient;
 import co.edu.unicauca.bancopreguntas.review.client.UsersServiceClient;
-import co.edu.unicauca.bancopreguntas.review.domain.EstadoRevision;
-import co.edu.unicauca.bancopreguntas.review.domain.EvaluacionRevisorEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.ObservacionEntity;
-import co.edu.unicauca.bancopreguntas.review.domain.RevisionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EvaluacionRevisorEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.ObservacionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.RevisionEntity;
 import co.edu.unicauca.bancopreguntas.review.messaging.ReviewEventPublisher;
 import co.edu.unicauca.bancopreguntas.review.repository.EvaluacionRevisorRepository;
 import co.edu.unicauca.bancopreguntas.review.repository.ObservacionRepository;
@@ -57,6 +57,12 @@ class ReviewServiceTest {
         }
         @Override public Optional<RevisionEntity> findByPreguntaIdAndRevisorId(Long pId, Long rId) {
             return map.values().stream().filter(r -> r.getPreguntaId().equals(pId) && r.getRevisorId().equals(rId)).findFirst();
+        }
+        @Override public Optional<RevisionEntity> findByPreguntaIdAndRevisorIdAndRonda(Long pId, Long rId, Integer ronda) {
+            int target = (ronda != null && ronda >= 1) ? ronda : 1;
+            return map.values().stream()
+                    .filter(r -> r.getPreguntaId().equals(pId) && r.getRevisorId().equals(rId) && r.getRonda() == target)
+                    .findFirst();
         }
         @Override public Page<RevisionEntity> findByRevisorId(Long rId, Pageable pageable) { return null; }
 

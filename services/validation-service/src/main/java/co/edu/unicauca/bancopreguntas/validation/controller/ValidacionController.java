@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -23,10 +24,13 @@ public class ValidacionController {
     }
 
     @PostMapping("/validar-pregunta")
+    @PreAuthorize("hasAnyRole('AUTOR', 'ADMINISTRADOR')")
     @Operation(summary = "Ejecutar validación estructural completa de una pregunta (HU1 - SSCRUM-35 a SSCRUM-40)")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Pregunta estructuralmente válida"),
-        @ApiResponse(responseCode = "400", description = "Pregunta inválida con lista de errores por campo")
+        @ApiResponse(responseCode = "400", description = "Pregunta inválida con lista de errores por campo"),
+        @ApiResponse(responseCode = "401", description = "Token JWT ausente o inválido"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado: rol AUTOR o ADMINISTRADOR requerido")
     })
     public ResponseEntity<ResultadoValidacionDTO> validarPregunta(@RequestBody PreguntaDTO pregunta) {
         ResultadoValidacionDTO resultado = validationEngine.validarPregunta(pregunta);
@@ -37,4 +41,3 @@ public class ValidacionController {
         }
     }
 }
-

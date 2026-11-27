@@ -1,4 +1,4 @@
-package co.edu.unicauca.bancopreguntas.review.domain;
+package co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity;
 
 public enum EstadoRevision {
     ASIGNADA,
