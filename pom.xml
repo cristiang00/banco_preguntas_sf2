@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>Banco de Preguntas Saber Pro - Sistema Distribuido</name>
-    <description>Arquitectura distribuida de microservicios orientada a eventos - Sprint 2</description>
+    <description>Arquitectura distribuida de microservicios orientada a eventos, seguridad Keycloak JWT y arquitectura hexagonal - Sprint 3</description>
 
     <properties>
         <java.version>17</java.version>

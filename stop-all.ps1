@@ -24,7 +24,7 @@ $stoppedAny = $false
 
 foreach ($port in $ports) {
     try {
-        $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+        $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
         if ($conns) {
             $pids = $conns.OwningProcess | Select-Object -Unique
             foreach ($procId in $pids) {
@@ -38,9 +38,21 @@ foreach ($port in $ports) {
     } catch {}
 }
 
+# Detener servidor OIDC local Java/Node en 8089 (sin afectar Keycloak en Docker)
+try {
+    $conns8089 = Get-NetTCPConnection -LocalPort 8089 -State Listen -ErrorAction SilentlyContinue
+    foreach ($procId in ($conns8089.OwningProcess | Select-Object -Unique)) {
+        $p = Get-Process -Id $procId -ErrorAction SilentlyContinue
+        if ($p -and $p.ProcessName -in @("java", "javaw", "node")) {
+            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+            Write-Host " -> Servidor OIDC local PID $procId (puerto 8089) detenido." -ForegroundColor Green
+            $stoppedAny = $true
+        }
+    }
+} catch {}
+
 if (-not $stoppedAny) {
-    Write-Host "No se encontraron microservicios activos en los puertos 8080-8087." -ForegroundColor DarkGray
+    Write-Host "No se encontraron microservicios activos en los puertos 8080-8087 / 8089." -ForegroundColor DarkGray
 } else {
     Write-Host "Todos los microservicios han sido detenidos exitosamente." -ForegroundColor Green
 }
-

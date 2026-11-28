@@ -1,8 +1,6 @@
 package co.edu.unicauca.bancopreguntas.questions.service;
 
 import co.edu.unicauca.bancopreguntas.contracts.dto.EstadoPreguntaDTO;
-import co.edu.unicauca.bancopreguntas.contracts.dto.OpcionDTO;
-import co.edu.unicauca.bancopreguntas.questions.domain.OpcionEntity;
 import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaBuilder;
 import co.edu.unicauca.bancopreguntas.questions.domain.PreguntaEntity;
 import co.edu.unicauca.bancopreguntas.questions.repository.PreguntaRepository;
@@ -10,15 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-
-import java.io.File;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Component
 public class QuestionDataInitializer implements CommandLineRunner {
@@ -38,89 +27,9 @@ public class QuestionDataInitializer implements CommandLineRunner {
             return;
         }
 
-        log.info("Iniciando migración y seeding de preguntas desde SQLite original...");
-        boolean migrado = intentarMigrarDesdeSQLite();
-
-        if (!migrado || preguntaRepository.count() == 0) {
-            crearPreguntasPorDefecto();
-        }
-
+        log.info("Inicializando preguntas por defecto...");
+        crearPreguntasPorDefecto();
         log.info("Inicialización de preguntas completada. Total preguntas: {}", preguntaRepository.count());
-    }
-
-    private boolean intentarMigrarDesdeSQLite() {
-        File[] posiblesRutas = new File[] {
-                new File("saberpro.db"),
-                new File("proyecto_so2_saberpro/saberpro.db"),
-                new File("../proyecto_so2_saberpro/saberpro.db"),
-                new File("../../proyecto_so2_saberpro/saberpro.db")
-        };
-
-        for (File dbFile : posiblesRutas) {
-            if (dbFile.exists()) {
-                try {
-                    Class.forName("org.sqlite.JDBC");
-                    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
-                         Statement stmt = conn.createStatement();
-                         ResultSet rs = stmt.executeQuery("SELECT * FROM preguntas")) {
-
-                        int count = 0;
-                        while (rs.next()) {
-                            Long id = rs.getLong("id");
-                            String contexto = rs.getString("contexto");
-                            String preguntaDirecta = rs.getString("pregunta_directa");
-                            String distractor1 = rs.getString("distractor1");
-                            String distractor2 = rs.getString("distractor2");
-                            String distractor3 = rs.getString("distractor3");
-                            String distractor4 = rs.getString("distractor4");
-                            String respuestaCorrecta = rs.getString("respuesta_correcta");
-                            String justificacion = rs.getString("justificacion");
-                            String bibliografia = rs.getString("bibliografia");
-                            String competencia = rs.getString("competencia");
-                            String tema = rs.getString("tema");
-                            String subtema = rs.getString("subtema");
-                            String nivelDificultad = rs.getString("nivel_dificultad");
-                            String estadoStr = rs.getString("estado");
-                            Long autorId = rs.getLong("autor_id");
-
-                            EstadoPreguntaDTO estado = EstadoPreguntaDTO.fromString(estadoStr);
-
-                            List<OpcionDTO> opciones = new ArrayList<>();
-                            opciones.add(new OpcionDTO("A", distractor1 != null ? distractor1 : "Opción A"));
-                            opciones.add(new OpcionDTO("B", distractor2 != null ? distractor2 : "Opción B"));
-                            opciones.add(new OpcionDTO("C", distractor3 != null ? distractor3 : "Opción C"));
-                            opciones.add(new OpcionDTO("D", distractor4 != null ? distractor4 : "Opción D"));
-
-                            PreguntaEntity p = new PreguntaBuilder()
-                                    .conId(id)
-                                    .conContexto(contexto)
-                                    .conPreguntaDirecta(preguntaDirecta)
-                                    .conOpciones(opciones)
-                                    .conRespuestaCorrecta(respuestaCorrecta)
-                                    .conJustificacion(justificacion)
-                                    .conBibliografia(bibliografia)
-                                    .conCompetencia(competencia)
-                                    .conTema(tema)
-                                    .conSubtema(subtema)
-                                    .conNivelDificultad(nivelDificultad)
-                                    .conAutorId(autorId)
-                                    .conAutorNombre("Autor " + autorId)
-                                    .conEstado(estado)
-                                    .conFechaCreacion(LocalDateTime.now())
-                                    .build();
-
-                            preguntaRepository.save(p);
-                            count++;
-                        }
-                        log.info("Migradas exitosamente {} preguntas desde SQLite ({})", count, dbFile.getPath());
-                        return count > 0;
-                    }
-                } catch (Throwable t) {
-                    log.warn("No se pudo migrar directamente desde SQLite {}: {}", dbFile.getPath(), t.getMessage());
-                }
-            }
-        }
-        return false;
     }
 
     private void crearPreguntasPorDefecto() {
@@ -167,4 +76,3 @@ public class QuestionDataInitializer implements CommandLineRunner {
         preguntaRepository.save(p2);
     }
 }
-

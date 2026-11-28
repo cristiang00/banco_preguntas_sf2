@@ -5,7 +5,8 @@ target/
 .vscode/
 frontend/
 integration-tests/
-proyecto_so2_saberpro/
+scripts/
+logs/
 *.docx
 *.pdf
 .env

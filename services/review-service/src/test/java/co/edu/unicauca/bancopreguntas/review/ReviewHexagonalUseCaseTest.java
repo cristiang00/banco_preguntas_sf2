@@ -7,6 +7,7 @@ import co.edu.unicauca.bancopreguntas.contracts.dto.PreguntaDTO;
 import co.edu.unicauca.bancopreguntas.contracts.dto.UserSummaryDTO;
 import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaAprobadaEvent;
 import co.edu.unicauca.bancopreguntas.contracts.events.PreguntaRechazadaEvent;
+import co.edu.unicauca.bancopreguntas.contracts.events.RabbitMQConstants;
 import co.edu.unicauca.bancopreguntas.contracts.events.RevisoresAsignadosEvent;
 import co.edu.unicauca.bancopreguntas.review.application.ports.output.*;
 import co.edu.unicauca.bancopreguntas.review.application.usecases.AsignarRevisoresUseCase;
@@ -19,7 +20,11 @@ import co.edu.unicauca.bancopreguntas.review.domain.model.Evaluacion;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Observacion;
 import co.edu.unicauca.bancopreguntas.review.domain.model.Revision;
 import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.JpaRevisionRepositoryAdapter;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EvaluacionRevisorEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.ObservacionEntity;
+import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.RevisionEntity;
 import co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.memory.InMemoryRevisionRepositoryAdapter;
+import co.edu.unicauca.bancopreguntas.review.messaging.ReviewEventPublisher;
 import co.edu.unicauca.bancopreguntas.review.repository.EvaluacionRevisorRepository;
 import co.edu.unicauca.bancopreguntas.review.repository.ObservacionRepository;
 import co.edu.unicauca.bancopreguntas.review.repository.RevisionRepository;
@@ -29,10 +34,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -265,9 +273,9 @@ class ReviewHexagonalUseCaseTest {
     @DisplayName("HU8.S3.2: Los mismos casos de uso funcionan idénticamente con JpaRevisionRepositoryAdapter e InMemoryRevisionRepositoryAdapter sin tocar el dominio")
     void testIntercambiabilidadAdaptadoresSinModificarDominio() {
         // Ejecutar el mismo flujo contra JpaRevisionRepositoryAdapter (segundo adaptador del puerto)
-        RevisionRepository stubJpaRev = new ReviewServiceTest.StubRevisionRepository();
-        EvaluacionRevisorRepository stubJpaEval = new ReviewServiceTest.StubEvaluacionRepository();
-        ObservacionRepository stubJpaObs = new ReviewServiceTest.StubObservacionRepository();
+        RevisionRepository stubJpaRev = new StubRevisionRepository();
+        EvaluacionRevisorRepository stubJpaEval = new StubEvaluacionRepository();
+        ObservacionRepository stubJpaObs = new StubObservacionRepository();
         RevisionRepositoryPort jpaAdapter = new JpaRevisionRepositoryAdapter(stubJpaRev, stubJpaEval, stubJpaObs);
 
         AsignarRevisoresUseCase asignarConJpa = new AsignarRevisoresUseCase(
@@ -424,5 +432,249 @@ class ReviewHexagonalUseCaseTest {
         assertEquals("APROBADA", content.get(0).get("estado"));
         assertEquals(1, content.get(1).get("ronda"));
         assertEquals("RECHAZADA", content.get(1).get("estado"));
+    }
+
+    @Test
+    @DisplayName("HU4: AsignarRevisoresUseCase rechaza 0 revisores, >3 revisores y al autor como revisor; permite 3")
+    void testAsignarRevisoresValidacionesLimitesYAutor() {
+        Long preguntaId = 950L;
+        PreguntaDTO p = new PreguntaDTO();
+        p.setId(preguntaId);
+        p.setAutorId(3L);
+        p.setAutorNombre("Autor");
+        p.setCompetencia("Lectura Crítica");
+        p.setNivelDificultad("Medio");
+        lenient().when(preguntasClientPort.obtenerPregunta(preguntaId)).thenReturn(Optional.of(p));
+        lenient().when(lifecycleClientPort.obtenerEstado(preguntaId)).thenReturn(EstadoPreguntaDTO.PENDIENTE_REVISION);
+        lenient().when(usuariosClientPort.buscarPorId(4L)).thenReturn(Optional.of(new UserSummaryDTO(4L, "r1", "Rev 1", "REVISOR", "ACTIVO", "r1@unicauca.edu.co")));
+        lenient().when(usuariosClientPort.buscarPorId(5L)).thenReturn(Optional.of(new UserSummaryDTO(5L, "r2", "Rev 2", "REVISOR", "ACTIVO", "r2@unicauca.edu.co")));
+        lenient().when(usuariosClientPort.buscarPorId(6L)).thenReturn(Optional.of(new UserSummaryDTO(6L, "r3", "Rev 3", "REVISOR", "ACTIVO", "r3@unicauca.edu.co")));
+
+        assertThrows(IllegalArgumentException.class, () -> asignarRevisoresUseCase.execute(preguntaId, List.of(), 1L, "c0"));
+        assertThrows(IllegalArgumentException.class, () -> asignarRevisoresUseCase.execute(preguntaId, List.of(4L, 5L, 6L, 7L), 1L, "c4"));
+        assertThrows(IllegalArgumentException.class, () -> asignarRevisoresUseCase.execute(preguntaId, List.of(3L), 1L, "c-autor"));
+
+        List<Revision> tres = asignarRevisoresUseCase.execute(preguntaId, List.of(4L, 5L, 6L), 1L, "c3");
+        assertEquals(3, tres.size());
+    }
+
+    @Test
+    @DisplayName("HU5: RegistrarDecisionUseCase exige observación al rechazar, bloquea revisor no asignado (403) y doble decisión (409)")
+    void testRegistrarDecisionValidacionesSeguridadYEstado() {
+        Long preguntaId = 960L;
+        Revision rev = repositoryPort.save(Revision.crearNueva(preguntaId, 4L, "Rev 1", "r1@unicauca.edu.co", "Lectura", "Medio"));
+
+        PreguntaDTO p = new PreguntaDTO();
+        p.setId(preguntaId);
+        p.setAutorId(2L);
+        p.setAutorNombre("Autor");
+        lenient().when(preguntasClientPort.obtenerPregunta(preguntaId)).thenReturn(Optional.of(p));
+        lenient().when(usuariosClientPort.buscarPorId(2L)).thenReturn(Optional.of(new UserSummaryDTO(2L, "autor1", "Autor", "AUTOR", "ACTIVO", "autor.real@unicauca.edu.co")));
+
+        assertThrows(SecurityException.class, () ->
+                registrarDecisionUseCase.execute(rev.getId(), new DecisionRequestDTO("APROBAR", null, "OK"), 999L, "c-403"));
+        assertThrows(IllegalArgumentException.class, () ->
+                registrarDecisionUseCase.execute(rev.getId(), new DecisionRequestDTO("RECHAZAR", List.of(), ""), 4L, "c-400"));
+
+        registrarDecisionUseCase.execute(rev.getId(), new DecisionRequestDTO("APROBAR", null, "OK"), 4L, "c-ok");
+        assertThrows(IllegalStateException.class, () ->
+                registrarDecisionUseCase.execute(rev.getId(), new DecisionRequestDTO("APROBAR", null, "Dup"), 4L, "c-409"));
+    }
+
+    @Test
+    @DisplayName("HU12.S2: ListarAsignadasUseCase aplica filtros de estado/competencia/dificultad antes de paginar")
+    void testListarAsignadasFiltrosCombinadosYPaginacionExacta() {
+        Long revisorId = 44L;
+        Revision r1 = Revision.crearNueva(971L, revisorId, "Rev", "r@u.co", "Matemáticas", "Medio");
+        Revision r2 = Revision.crearNueva(972L, revisorId, "Rev", "r@u.co", "Matemáticas", "Alto");
+        r2.evaluar();
+        Revision r3 = Revision.crearNueva(973L, revisorId, "Rev", "r@u.co", "Lectura", "Medio");
+        repositoryPort.save(r1);
+        repositoryPort.save(r2);
+        repositoryPort.save(r3);
+
+        PreguntaDTO sample = new PreguntaDTO();
+        sample.setContexto("Contexto demo");
+        lenient().when(preguntasClientPort.obtenerPregunta(anyLong())).thenReturn(Optional.of(sample));
+
+        Map<String, Object> porEstado = listarAsignadasUseCase.execute(revisorId, 0, 10, "ASIGNADA", null, null);
+        assertEquals(2L, ((Number) porEstado.get("totalElements")).longValue());
+
+        Map<String, Object> paginado = listarAsignadasUseCase.execute(revisorId, 0, 1, "ASIGNADA", null, null);
+        assertEquals(1, ((List<?>) paginado.get("content")).size());
+        assertEquals(2L, ((Number) paginado.get("totalElements")).longValue());
+        assertEquals(2, ((Number) paginado.get("totalPages")).intValue());
+    }
+
+    @Test
+    @DisplayName("HU12.S3: ReviewEventPublisher publica en exchange saberpro.events vía RabbitTemplate")
+    void testPublicacionRabbitMQEnExchangeSaberproEvents() {
+        RabbitTemplate mockRabbitTemplate = mock(RabbitTemplate.class);
+        ReviewEventPublisher publisherWithRabbit = new ReviewEventPublisher(
+                null, mockRabbitTemplate, null, "http://localhost:8086", "http://localhost:8087");
+
+        PreguntaAprobadaEvent event = new PreguntaAprobadaEvent(
+                999L, 3L, "Autor", "autor.real@unicauca.edu.co", "Contexto", "Aprobada", "corr-rmq");
+
+        publisherWithRabbit.publish(event);
+
+        verify(mockRabbitTemplate, times(1)).convertAndSend(
+                eq(RabbitMQConstants.EXCHANGE_NAME),
+                eq("saberpro.PreguntaAprobada"),
+                anyString());
+    }
+
+    // Stubs en memoria de Spring Data JPA para probar JpaRevisionRepositoryAdapter sin BD
+    static class StubRevisionRepository implements RevisionRepository {
+        Map<Long, RevisionEntity> map = new HashMap<>();
+        long seq = 1;
+
+        @Override
+        public <S extends RevisionEntity> S save(S entity) {
+            if (entity.getId() == null) entity.setId(seq++);
+            map.put(entity.getId(), entity);
+            return entity;
+        }
+
+        @Override public Optional<RevisionEntity> findById(Long id) { return Optional.ofNullable(map.get(id)); }
+        @Override public List<RevisionEntity> findByPreguntaId(Long pId) {
+            return map.values().stream().filter(r -> r.getPreguntaId().equals(pId)).collect(Collectors.toList());
+        }
+        @Override public Optional<RevisionEntity> findByPreguntaIdAndRevisorId(Long pId, Long rId) {
+            return map.values().stream().filter(r -> r.getPreguntaId().equals(pId) && r.getRevisorId().equals(rId)).findFirst();
+        }
+        @Override public Optional<RevisionEntity> findByPreguntaIdAndRevisorIdAndRonda(Long pId, Long rId, Integer ronda) {
+            int target = (ronda != null && ronda >= 1) ? ronda : 1;
+            return map.values().stream()
+                    .filter(r -> r.getPreguntaId().equals(pId) && r.getRevisorId().equals(rId) && r.getRonda() == target)
+                    .findFirst();
+        }
+        @Override public Page<RevisionEntity> findByRevisorId(Long rId, Pageable pageable) { return Page.empty(pageable); }
+        @Override
+        public Page<RevisionEntity> findByRevisorIdWithFilters(Long rId,
+                co.edu.unicauca.bancopreguntas.review.infrastructure.persistence.jpa.entity.EstadoRevision estado,
+                String competencia, String dificultad, Pageable pageable) {
+            List<RevisionEntity> filtered = map.values().stream()
+                    .filter(r -> r.getRevisorId().equals(rId))
+                    .filter(r -> estado == null || r.getEstado() == estado)
+                    .filter(r -> competencia == null || (r.getCompetencia() != null && r.getCompetencia().equalsIgnoreCase(competencia)))
+                    .filter(r -> dificultad == null || (r.getNivelDificultad() != null && r.getNivelDificultad().equalsIgnoreCase(dificultad)))
+                    .collect(Collectors.toList());
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), filtered.size());
+            List<RevisionEntity> sub = (start <= end && start < filtered.size()) ? filtered.subList(start, end) : Collections.emptyList();
+            return new PageImpl<>(sub, pageable, filtered.size());
+        }
+        @Override public List<RevisionEntity> findByRevisorId(Long rId) {
+            return map.values().stream().filter(r -> r.getRevisorId().equals(rId)).collect(Collectors.toList());
+        }
+        @Override public boolean existsByPreguntaIdAndRevisorId(Long pId, Long rId) {
+            return map.values().stream().anyMatch(r -> r.getPreguntaId().equals(pId) && r.getRevisorId().equals(rId));
+        }
+        @Override public <S extends RevisionEntity> List<S> saveAll(Iterable<S> entities) { return null; }
+        @Override public boolean existsById(Long aLong) { return map.containsKey(aLong); }
+        @Override public List<RevisionEntity> findAll() { return new ArrayList<>(map.values()); }
+        @Override public List<RevisionEntity> findAllById(Iterable<Long> longs) { return null; }
+        @Override public long count() { return map.size(); }
+        @Override public void deleteById(Long aLong) { map.remove(aLong); }
+        @Override public void delete(RevisionEntity entity) { map.remove(entity.getId()); }
+        @Override public void deleteAllById(Iterable<? extends Long> longs) {}
+        @Override public void deleteAll(Iterable<? extends RevisionEntity> entities) {}
+        @Override public void deleteAll() {}
+        @Override public void flush() {}
+        @Override public <S extends RevisionEntity> S saveAndFlush(S entity) { return save(entity); }
+        @Override public <S extends RevisionEntity> List<S> saveAllAndFlush(Iterable<S> entities) { return null; }
+        @Override public void deleteAllInBatch(Iterable<RevisionEntity> entities) {}
+        @Override public void deleteAllByIdInBatch(Iterable<Long> longs) {}
+        @Override public void deleteAllInBatch() {}
+        @Override public RevisionEntity getOne(Long aLong) { return null; }
+        @Override public RevisionEntity getById(Long aLong) { return null; }
+        @Override public RevisionEntity getReferenceById(Long aLong) { return null; }
+        @Override public <S extends RevisionEntity> Optional<S> findOne(org.springframework.data.domain.Example<S> example) { return Optional.empty(); }
+        @Override public <S extends RevisionEntity> List<S> findAll(org.springframework.data.domain.Example<S> example) { return null; }
+        @Override public <S extends RevisionEntity> List<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Sort sort) { return null; }
+        @Override public <S extends RevisionEntity> Page<S> findAll(org.springframework.data.domain.Example<S> example, Pageable pageable) { return null; }
+        @Override public <S extends RevisionEntity> long count(org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends RevisionEntity> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
+        @Override public <S extends RevisionEntity, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
+        @Override public List<RevisionEntity> findAll(org.springframework.data.domain.Sort sort) { return null; }
+        @Override public Page<RevisionEntity> findAll(Pageable pageable) { return null; }
+    }
+
+    static class StubEvaluacionRepository implements EvaluacionRevisorRepository {
+        List<EvaluacionRevisorEntity> list = new ArrayList<>();
+        @Override public <S extends EvaluacionRevisorEntity> S save(S entity) { list.add(entity); return entity; }
+        @Override public List<EvaluacionRevisorEntity> findByRevisionId(Long revisionId) {
+            return list.stream().filter(e -> e.getRevisionId().equals(revisionId)).collect(Collectors.toList());
+        }
+        @Override public <S extends EvaluacionRevisorEntity> List<S> saveAll(Iterable<S> entities) { return null; }
+        @Override public Optional<EvaluacionRevisorEntity> findById(Long aLong) { return Optional.empty(); }
+        @Override public boolean existsById(Long aLong) { return false; }
+        @Override public List<EvaluacionRevisorEntity> findAll() { return list; }
+        @Override public List<EvaluacionRevisorEntity> findAllById(Iterable<Long> longs) { return null; }
+        @Override public long count() { return list.size(); }
+        @Override public void deleteById(Long aLong) {}
+        @Override public void delete(EvaluacionRevisorEntity entity) {}
+        @Override public void deleteAllById(Iterable<? extends Long> longs) {}
+        @Override public void deleteAll(Iterable<? extends EvaluacionRevisorEntity> entities) {}
+        @Override public void deleteAll() {}
+        @Override public void flush() {}
+        @Override public <S extends EvaluacionRevisorEntity> S saveAndFlush(S entity) { return save(entity); }
+        @Override public <S extends EvaluacionRevisorEntity> List<S> saveAllAndFlush(Iterable<S> entities) { return null; }
+        @Override public void deleteAllInBatch(Iterable<EvaluacionRevisorEntity> entities) {}
+        @Override public void deleteAllByIdInBatch(Iterable<Long> longs) {}
+        @Override public void deleteAllInBatch() {}
+        @Override public EvaluacionRevisorEntity getOne(Long aLong) { return null; }
+        @Override public EvaluacionRevisorEntity getById(Long aLong) { return null; }
+        @Override public EvaluacionRevisorEntity getReferenceById(Long aLong) { return null; }
+        @Override public <S extends EvaluacionRevisorEntity> Optional<S> findOne(org.springframework.data.domain.Example<S> example) { return Optional.empty(); }
+        @Override public <S extends EvaluacionRevisorEntity> List<S> findAll(org.springframework.data.domain.Example<S> example) { return null; }
+        @Override public <S extends EvaluacionRevisorEntity> List<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Sort sort) { return null; }
+        @Override public <S extends EvaluacionRevisorEntity> Page<S> findAll(org.springframework.data.domain.Example<S> example, Pageable pageable) { return null; }
+        @Override public <S extends EvaluacionRevisorEntity> long count(org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends EvaluacionRevisorEntity> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
+        @Override public <S extends EvaluacionRevisorEntity, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
+        @Override public List<EvaluacionRevisorEntity> findAll(org.springframework.data.domain.Sort sort) { return null; }
+        @Override public Page<EvaluacionRevisorEntity> findAll(Pageable pageable) { return null; }
+    }
+
+    static class StubObservacionRepository implements ObservacionRepository {
+        List<ObservacionEntity> list = new ArrayList<>();
+        @Override public <S extends ObservacionEntity> S save(S entity) { list.add(entity); return entity; }
+        @Override public List<ObservacionEntity> findByRevisionId(Long rId) {
+            return list.stream().filter(o -> o.getRevisionId().equals(rId)).collect(Collectors.toList());
+        }
+        @Override public List<ObservacionEntity> findByPreguntaIdAndVisibleAutorTrue(Long pId) {
+            return list.stream().filter(o -> o.getPreguntaId().equals(pId)).collect(Collectors.toList());
+        }
+        @Override public <S extends ObservacionEntity> List<S> saveAll(Iterable<S> entities) { return null; }
+        @Override public Optional<ObservacionEntity> findById(Long aLong) { return Optional.empty(); }
+        @Override public boolean existsById(Long aLong) { return false; }
+        @Override public List<ObservacionEntity> findAll() { return list; }
+        @Override public List<ObservacionEntity> findAllById(Iterable<Long> longs) { return null; }
+        @Override public long count() { return list.size(); }
+        @Override public void deleteById(Long aLong) {}
+        @Override public void delete(ObservacionEntity entity) {}
+        @Override public void deleteAllById(Iterable<? extends Long> longs) {}
+        @Override public void deleteAll(Iterable<? extends ObservacionEntity> entities) {}
+        @Override public void deleteAll() {}
+        @Override public void flush() {}
+        @Override public <S extends ObservacionEntity> S saveAndFlush(S entity) { return save(entity); }
+        @Override public <S extends ObservacionEntity> List<S> saveAllAndFlush(Iterable<S> entities) { return null; }
+        @Override public void deleteAllInBatch(Iterable<ObservacionEntity> entities) {}
+        @Override public void deleteAllByIdInBatch(Iterable<Long> longs) {}
+        @Override public void deleteAllInBatch() {}
+        @Override public ObservacionEntity getOne(Long aLong) { return null; }
+        @Override public ObservacionEntity getById(Long aLong) { return null; }
+        @Override public ObservacionEntity getReferenceById(Long aLong) { return null; }
+        @Override public <S extends ObservacionEntity> Optional<S> findOne(org.springframework.data.domain.Example<S> example) { return Optional.empty(); }
+        @Override public <S extends ObservacionEntity> List<S> findAll(org.springframework.data.domain.Example<S> example) { return null; }
+        @Override public <S extends ObservacionEntity> List<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Sort sort) { return null; }
+        @Override public <S extends ObservacionEntity> Page<S> findAll(org.springframework.data.domain.Example<S> example, Pageable pageable) { return null; }
+        @Override public <S extends ObservacionEntity> long count(org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends ObservacionEntity> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
+        @Override public <S extends ObservacionEntity, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
+        @Override public List<ObservacionEntity> findAll(org.springframework.data.domain.Sort sort) { return null; }
+        @Override public Page<ObservacionEntity> findAll(Pageable pageable) { return null; }
     }
 }

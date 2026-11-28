@@ -31,11 +31,11 @@ function Test-PortOpen([string]$HostName, [int]$Port) {
 }
 
 function Stop-RunningServices {
-    Write-Host "Deteniendo microservicios activos en puertos 8080-8087..." -ForegroundColor Yellow
+    Write-Host "Deteniendo microservicios activos en puertos 8080-8087 (y OIDC local en 8089 si aplica)..." -ForegroundColor Yellow
     $ports = 8080..8087
     foreach ($port in $ports) {
         try {
-            $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+            $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
             if ($conns) {
                 $pids = $conns.OwningProcess | Select-Object -Unique
                 foreach ($procId in $pids) {
@@ -47,6 +47,17 @@ function Stop-RunningServices {
             }
         } catch {}
     }
+    # Detener servidor OIDC local Java en 8089 (sin afectar Keycloak en Docker)
+    try {
+        $conns8089 = Get-NetTCPConnection -LocalPort 8089 -State Listen -ErrorAction SilentlyContinue
+        foreach ($procId in ($conns8089.OwningProcess | Select-Object -Unique)) {
+            $p = Get-Process -Id $procId -ErrorAction SilentlyContinue
+            if ($p -and $p.ProcessName -in @("java", "javaw", "node")) {
+                Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+                Write-Host " -> Servidor OIDC local detenido (PID: $procId, Puerto: 8089)" -ForegroundColor Green
+            }
+        }
+    } catch {}
 }
 
 if ($Stop) {
@@ -126,7 +137,32 @@ if (-not (Test-Path $logsDir)) {
     New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
 }
 
-Write-Host "[2/3] Levantando microservicios..." -ForegroundColor Yellow
+Write-Host "[2/3] Verificando autenticacion OIDC/Keycloak (:8089) y levantando microservicios..." -ForegroundColor Yellow
+
+$oidcScript = Join-Path $PSScriptRoot "scripts\LocalOidcServer.java"
+if (Test-PortOpen "localhost" 8089) {
+    Write-Host " [OK] Keycloak / OIDC ya activo en puerto 8089 (se usara esa instancia)." -ForegroundColor Green
+} elseif (Test-Path $oidcScript) {
+    Write-Host " [->] No hay Keycloak en :8089; iniciando servidor OIDC/JWKS local (scripts\LocalOidcServer.java)..." -ForegroundColor Cyan
+    $oidcOut = Join-Path $logsDir "local-oidc.log"
+    $oidcErr = Join-Path $logsDir "local-oidc-err.log"
+    if ($Console) {
+        Start-Process cmd.exe -ArgumentList @("/k", "title LOCAL-OIDC [8089] & java `"$oidcScript`"") -WorkingDirectory $PSScriptRoot
+    } else {
+        Start-Process -FilePath "java" -ArgumentList @($oidcScript) -WorkingDirectory $PSScriptRoot -RedirectStandardOutput $oidcOut -RedirectStandardError $oidcErr
+    }
+    $oidcSw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($oidcSw.Elapsed.TotalSeconds -lt 15 -and -not (Test-PortOpen "localhost" 8089)) {
+        Start-Sleep -Milliseconds 500
+    }
+    if (Test-PortOpen "localhost" 8089) {
+        Write-Host " [OK] Servidor OIDC/JWKS local activo en puerto 8089." -ForegroundColor Green
+    } else {
+        Write-Host " [WARN] El servidor OIDC local aun esta iniciando en :8089 (revisa logs\local-oidc-err.log)." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host " [WARN] Puerto 8089 no disponible y falta scripts\LocalOidcServer.java. El login requiere Keycloak en :8089." -ForegroundColor Red
+}
 
 foreach ($s in $services) {
     $isOpen = Test-PortOpen "localhost" $s.Port
@@ -137,32 +173,38 @@ foreach ($s in $services) {
         $outLog = Join-Path $logsDir "$($s.Name).log"
         $errLog = Join-Path $logsDir "$($s.Name)-err.log"
         if ($Console) {
-            Start-Process cmd.exe -ArgumentList @("/k", "title $($s.Name) [$($s.Port)] & java -jar `"$($s.Jar)`"") -WorkingDirectory $PSScriptRoot
+            Start-Process cmd.exe -ArgumentList @("/k", "title $($s.Name) [$($s.Port)] & java -Xmx256m -jar `"$($s.Jar)`"") -WorkingDirectory $PSScriptRoot
         } else {
-            Start-Process -FilePath "java" -ArgumentList @("-jar", $s.Jar) -WorkingDirectory $PSScriptRoot -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+            Start-Process -FilePath "java" -ArgumentList @("-Xmx256m", "-jar", $s.Jar) -WorkingDirectory $PSScriptRoot -RedirectStandardOutput $outLog -RedirectStandardError $errLog
         }
     }
 }
 
-Write-Host "[3/3] Verificando disponibilidad de servicios (logs en $logsDir)..." -ForegroundColor Yellow
-$timeoutSeconds = 25
+Write-Host "[3/3] Verificando disponibilidad de los 8 microservicios + OIDC (logs en $logsDir)..." -ForegroundColor Yellow
+$timeoutSeconds = 60
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-$gatewayReady = $false
+$allReady = $false
 
 while ($stopwatch.Elapsed.TotalSeconds -lt $timeoutSeconds) {
-    if (Test-PortOpen "localhost" 8080) {
-        $gatewayReady = $true
-        break
+    $allReady = (Test-PortOpen "localhost" 8089)
+    if ($allReady) {
+        foreach ($s in $services) {
+            if (-not (Test-PortOpen "localhost" $s.Port)) {
+                $allReady = $false
+                break
+            }
+        }
     }
+    if ($allReady) { break }
     Write-Host "." -NoNewline -ForegroundColor Yellow
-    Start-Sleep -Seconds 1
+    Start-Sleep -Seconds 2
 }
 Write-Host ""
 
-if ($gatewayReady) {
-    Write-Host "[OK] API Gateway activo y respondiendo en el puerto 8080." -ForegroundColor Green
+if ($allReady) {
+    Write-Host "[OK] Todos los 8 microservicios + OIDC (:8089) activos y listos." -ForegroundColor Green
 } else {
-    Write-Host "[INFO] Los servicios estan iniciando en segundo plano. Consulte la carpeta 'logs' para mas detalle." -ForegroundColor Yellow
+    Write-Host "[INFO] Algunos servicios siguen iniciando. Consulta la carpeta 'logs' para mas detalle." -ForegroundColor Yellow
 }
 
 Write-Host ""

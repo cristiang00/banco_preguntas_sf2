@@ -241,7 +241,7 @@ curl -X POST http://localhost:8089/realms/saberpro/protocol/openid-connect/token
 .\mvnw.cmd test -pl services/review-service
 ```
 
-### Cobertura automatizada verificada (`119/119` pruebas en verde)
+### Cobertura automatizada verificada (`110/110` pruebas en verde)
 
 | Módulo | Pruebas | Estado |
 |--------|---------|--------|
@@ -250,7 +250,7 @@ curl -X POST http://localhost:8089/realms/saberpro/protocol/openid-connect/token
 | `questions-service` | 19 | ✅ |
 | `validation-service` | 8 | ✅ |
 | `lifecycle-service` | 14 | ✅ |
-| `review-service` | 34 | ✅ |
+| `review-service` | 25 | ✅ |
 | `notification-service` | 9 | ✅ |
 | `audit-service` | 5 | ✅ |
 | `frontend` | 5 | ✅ |
@@ -275,20 +275,19 @@ banco_preguntas_sf2/
 │   └── audit-service/                    # Auditoría (Observer, RabbitMQ)
 ├── frontend/                             # Cliente de escritorio Swing (fuera de Compose)
 ├── integration-tests/                    # Pruebas de integración del bus de eventos
+├── scripts/
+│   └── LocalOidcServer.java              # Servidor OIDC/JWKS local para ejecución sin Docker
 ├── docker/
 │   ├── init-db.sql                       # Creación de las 8 BDs independientes
 │   └── keycloak/
 │       └── saberpro-realm.json           # Realm Keycloak importable al arranque
 ├── docs/
 │   ├── Documento-Arquitectura-Sprint3.pdf
-│   ├── arquitectura-sprint3.md
-│   ├── sprint3-progreso.md
-│   └── EntregablesSegundoCorte2026.2-IngSoft2.docx
+│   └── arquitectura-sprint3.md
 ├── docker-compose.yml
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
-├── HU-Sprint-3-para-Jira.pdf
 └── pom.xml
 ```
 

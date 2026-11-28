@@ -69,7 +69,7 @@ public class ReviewEventPublisher implements EventPublisher {
     @Override
     public void publish(DomainEvent event) {
         if (event == null) return;
-        log.info("Publicando evento desde ReviewService [{}]: aggregateId={}, correlationId={}",
+        log.info("Publicando evento desde review-service [{}]: aggregateId={}, correlationId={}",
                 event.getEventType(), event.getAggregateId(), event.getCorrelationId());
 
         domainEventBus.publish(event);

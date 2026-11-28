@@ -130,6 +130,9 @@ public class ApiClient {
 
         try (OutputStream os = conn.getOutputStream()) {
             os.write(formBody.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ioEx) {
+            throw new IOException("No se pudo conectar con Keycloak/OIDC en " + keycloakTokenUrl
+                    + " (verifique que el puerto 8089 esté activo con Keycloak o scripts/LocalOidcServer.java)", ioEx);
         }
 
         int code = conn.getResponseCode();

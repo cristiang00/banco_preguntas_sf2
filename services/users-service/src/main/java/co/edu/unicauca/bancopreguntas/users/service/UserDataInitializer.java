@@ -10,11 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.time.LocalDateTime;
 
 @Component
@@ -37,64 +32,15 @@ public class UserDataInitializer implements CommandLineRunner {
             return;
         }
 
-        log.info("Inicializando migración y seeding de usuarios...");
-        boolean migradoDesdeSQLite = intentarMigrarDesdeSQLite();
-
-        if (!migradoDesdeSQLite || usuarioRepository.count() == 0) {
-            crearUsuariosPorDefecto();
-        }
-
+        log.info("Inicializando usuarios por defecto...");
+        crearUsuariosPorDefecto();
         log.info("Carga inicial de usuarios finalizada con éxito. Total usuarios: {}", usuarioRepository.count());
-    }
-
-    private boolean intentarMigrarDesdeSQLite() {
-        File[] posiblesRutas = new File[] {
-            new File("saberpro.db"),
-            new File("proyecto_so2_saberpro/saberpro.db"),
-            new File("../proyecto_so2_saberpro/saberpro.db"),
-            new File("../../proyecto_so2_saberpro/saberpro.db")
-        };
-
-        for (File dbFile : posiblesRutas) {
-            if (dbFile.exists()) {
-                try {
-                    Class.forName("org.sqlite.JDBC");
-                    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
-                         Statement stmt = conn.createStatement();
-                         ResultSet rs = stmt.executeQuery("SELECT id, nombre_usuario, nombre_completo, rol, estado, password_hash FROM usuarios")) {
-
-                        int count = 0;
-                        while (rs.next()) {
-                            Long id = rs.getLong("id");
-                            String username = rs.getString("nombre_usuario");
-                            String fullName = rs.getString("nombre_completo");
-                            String rolStr = rs.getString("rol");
-                            String estadoStr = rs.getString("estado");
-                            String passHash = rs.getString("password_hash");
-
-                            Rol rol = parseRol(rolStr);
-                            EstadoUsuario estado = "ACTIVO".equalsIgnoreCase(estadoStr) ? EstadoUsuario.ACTIVO : EstadoUsuario.INACTIVO;
-                            String email = username.toLowerCase() + "@unicauca.edu.co";
-
-                            UsuarioEntity u = new UsuarioEntity(id, username, fullName, email, rol, estado, passHash, LocalDateTime.now());
-                            usuarioRepository.save(u);
-                            count++;
-                        }
-                        log.info("Migrados exitosamente {} usuarios desde SQLite ({})", count, dbFile.getPath());
-                        return count > 0;
-                    }
-                } catch (Throwable t) {
-                    log.warn("No se pudo migrar directamente desde SQLite {}: {}", dbFile.getPath(), t.getMessage());
-                }
-            }
-        }
-        return false;
     }
 
     private void crearUsuariosPorDefecto() {
         String defaultHash = passwordHasher.hash("Password123!@");
 
-        // Orden alineado con el mapeo de IDs de Keycloak en JwtValidator / ApiClient:
+        // Orden alineado con el mapeo de IDs de Keycloak en KeycloakJwtExtractor / ApiClient:
         // 1=admin, 2=autor1, 3=juan12 (preguntas iniciales), 4=revisor1, 5=revisor2
         crearSiNoExiste("admin", "Administrador Principal", "admin@unicauca.edu.co", Rol.ADMINISTRADOR, defaultHash);
         crearSiNoExiste("autor1", "Autor Prueba", "autor1@unicauca.edu.co", Rol.AUTOR, defaultHash);
@@ -115,17 +61,4 @@ public class UserDataInitializer implements CommandLineRunner {
             usuarioRepository.save(u);
         }
     }
-
-    private Rol parseRol(String rolStr) {
-        if (rolStr == null) return Rol.DOCENTE;
-        switch (rolStr.toUpperCase()) {
-            case "ADMINISTRADOR": return Rol.ADMINISTRADOR;
-            case "AUTOR":
-            case "AUTOR_PREGUNTAS": return Rol.AUTOR;
-            case "REVISOR": return Rol.REVISOR;
-            case "ESTUDIANTE": return Rol.ESTUDIANTE;
-            default: return Rol.DOCENTE;
-        }
-    }
 }
-

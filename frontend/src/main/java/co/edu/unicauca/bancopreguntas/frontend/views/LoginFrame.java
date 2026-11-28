@@ -101,20 +101,33 @@ public class LoginFrame extends JFrame {
         btnLogin.setEnabled(false);
         lblError.setText("Autenticando...");
 
-        SwingUtilities.invokeLater(() -> {
-            try {
-                TokenResponseDTO tokenResponse = ApiClient.getInstance().login(username, password);
-                lblError.setText("");
-                dispose(); // Cerrar login
-                new MainDashboardFrame(tokenResponse).setVisible(true);
-            } catch (ApiException ex) {
-                lblError.setText("Error (" + ex.getStatusCode() + "): " + ex.getMessage());
-            } catch (Exception ex) {
-                lblError.setText("Falla de conexión con API Gateway: " + ex.getMessage());
-            } finally {
-                btnLogin.setEnabled(true);
+        new SwingWorker<TokenResponseDTO, Void>() {
+            @Override
+            protected TokenResponseDTO doInBackground() throws Exception {
+                return ApiClient.getInstance().login(username, password);
             }
-        });
+
+            @Override
+            protected void done() {
+                try {
+                    TokenResponseDTO tokenResponse = get();
+                    lblError.setText("");
+                    dispose(); // Cerrar login
+                    new MainDashboardFrame(tokenResponse).setVisible(true);
+                } catch (java.util.concurrent.ExecutionException ex) {
+                    Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                    if (cause instanceof ApiException apiEx) {
+                        lblError.setText("<html><center>Error (" + apiEx.getStatusCode() + "): " + apiEx.getMessage() + "</center></html>");
+                    } else {
+                        lblError.setText("<html><center>" + cause.getMessage() + "</center></html>");
+                    }
+                } catch (Exception ex) {
+                    lblError.setText("<html><center>Error de conexión: " + ex.getMessage() + "</center></html>");
+                } finally {
+                    btnLogin.setEnabled(true);
+                }
+            }
+        }.execute();
     }
 }
 

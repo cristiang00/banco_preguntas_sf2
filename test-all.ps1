@@ -28,12 +28,12 @@ if ($exitCode -eq 0) {
     Write-Host " [OK] questions-service:      19 pruebas (Builder, Facade con filtros/paginacion, versionado HU6)" -ForegroundColor Green
     Write-Host " [OK] validation-service:     8 pruebas (5 reglas estructurales y ValidationEngine)" -ForegroundColor Green
     Write-Host " [OK] lifecycle-service:      14 pruebas (Patron State, Rechazada->Borrador HU6, broker)" -ForegroundColor Green
-    Write-Host " [OK] review-service:         34 pruebas (Hexagonal, JPA vs InMemory, consenso por ronda, @PreAuthorize)" -ForegroundColor Green
+    Write-Host " [OK] review-service:         25 pruebas (Hexagonal, JPA vs InMemory, consenso por ronda, @PreAuthorize)" -ForegroundColor Green
     Write-Host " [OK] notification-service:   9 pruebas (Factory Method, SmtpEmailAdapter, RabbitMQ)" -ForegroundColor Green
     Write-Host " [OK] audit-service:          5 pruebas (Observer, trazabilidad RabbitMQ, idempotencia)" -ForegroundColor Green
     Write-Host " [OK] frontend:               5 pruebas (Login OIDC Keycloak simulado, vistas Swing)" -ForegroundColor Green
     Write-Host " [OK] integration-tests:      2 pruebas (Flujo distribuido orientado a eventos)" -ForegroundColor Green
-    Write-Host " Total de pruebas: 119 aprobadas (0 fallas, 0 errores, 0 omitidas)" -ForegroundColor Cyan
+    Write-Host " Total de pruebas: 110 aprobadas (0 fallas, 0 errores, 0 omitidas)" -ForegroundColor Cyan
 } else {
     Write-Host "==========================================================" -ForegroundColor Red
     Write-Host "[FAIL] FALLA EN LA SUITE DE PRUEBAS (Codigo de salida: $exitCode)" -ForegroundColor Red
