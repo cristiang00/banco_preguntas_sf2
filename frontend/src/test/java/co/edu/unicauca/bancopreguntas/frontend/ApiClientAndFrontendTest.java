@@ -4,6 +4,7 @@ import co.edu.unicauca.bancopreguntas.contracts.dto.TokenResponseDTO;
 import co.edu.unicauca.bancopreguntas.frontend.client.ApiClient;
 import co.edu.unicauca.bancopreguntas.frontend.client.ApiException;
 import co.edu.unicauca.bancopreguntas.frontend.utils.EstadoCellRenderer;
+import co.edu.unicauca.bancopreguntas.frontend.utils.UIUtils;
 import co.edu.unicauca.bancopreguntas.frontend.views.*;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.BeforeAll;
@@ -162,5 +163,32 @@ class ApiClientAndFrontendTest {
                 // En entorno CI/headless, JDialog lanza HeadlessException al crear ventanas nativas
             }
         });
+    }
+
+    @Test
+    @DisplayName("UIUtils: alertas claras para cliente final con sufijo Código y sin corchetes []")
+    void testMensajesAmigablesSinCodigosTecnicosNiCorchetes() {
+        ApiException err403 = new ApiException(403, "Error (403): [Solo el autor] puede ver el historial");
+        String msg403 = UIUtils.formatUserFriendlyError(err403, "consultar historial");
+        assertTrue(msg403.contains("Solo el autor puede ver el historial"));
+        assertTrue(msg403.endsWith("Código: 403"));
+        assertFalse(msg403.contains("[") || msg403.contains("]"), "No debe mostrar corchetes");
+        assertEquals("Permisos insuficientes", UIUtils.getAlertTitle(err403));
+
+        ApiException err401 = new ApiException(401, "Error 401: Token JWT vencido");
+        String msg401 = UIUtils.formatUserFriendlyError(err401, "iniciar sesión");
+        assertFalse(msg401.toLowerCase().contains("jwt"));
+        assertTrue(msg401.endsWith("Código: 401"));
+        assertEquals("Acceso no autorizado", UIUtils.getAlertTitle(err401));
+
+        ApiException err409 = new ApiException(409, "Solo se pueden editar preguntas en estado Borrador");
+        String msg409 = UIUtils.formatUserFriendlyError(err409, "editar");
+        assertTrue(msg409.contains("Borrador"));
+        assertTrue(msg409.endsWith("Código: 409"));
+        assertEquals("Acción no permitida", UIUtils.getAlertTitle(err409));
+
+        String msgConn = UIUtils.formatUserFriendlyError(new java.io.IOException("Connection refused"), "cargar datos");
+        assertFalse(msgConn.contains("Connection refused"));
+        assertTrue(msgConn.toLowerCase().contains("conectar"));
     }
 }

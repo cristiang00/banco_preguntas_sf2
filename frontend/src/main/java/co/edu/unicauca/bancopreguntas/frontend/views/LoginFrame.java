@@ -75,7 +75,7 @@ public class LoginFrame extends JFrame {
         UIUtils.stylizePrimaryButton(btnLogin);
         btnLogin.addActionListener(e -> ejecutarLogin());
 
-        JLabel lblInfo = new JLabel("Autenticación Keycloak OIDC → API Gateway", SwingConstants.CENTER);
+        JLabel lblInfo = new JLabel("Sistema de Gestión de Preguntas Saber Pro", SwingConstants.CENTER);
         lblInfo.setFont(UIUtils.FONT_SMALL);
         lblInfo.setForeground(UIUtils.COLOR_TEXT_MUTED);
 
@@ -116,13 +116,11 @@ public class LoginFrame extends JFrame {
                     new MainDashboardFrame(tokenResponse).setVisible(true);
                 } catch (java.util.concurrent.ExecutionException ex) {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    if (cause instanceof ApiException apiEx) {
-                        lblError.setText("<html><center>Error (" + apiEx.getStatusCode() + "): " + apiEx.getMessage() + "</center></html>");
-                    } else {
-                        lblError.setText("<html><center>" + cause.getMessage() + "</center></html>");
-                    }
+                    String mensaje = UIUtils.formatUserFriendlyError(cause, "iniciar sesión");
+                    lblError.setText("<html><center>" + mensaje.replace("\n", "<br>") + "</center></html>");
                 } catch (Exception ex) {
-                    lblError.setText("<html><center>Error de conexión: " + ex.getMessage() + "</center></html>");
+                    String mensaje = UIUtils.formatUserFriendlyError(ex, "iniciar sesión");
+                    lblError.setText("<html><center>" + mensaje.replace("\n", "<br>") + "</center></html>");
                 } finally {
                     btnLogin.setEnabled(true);
                 }

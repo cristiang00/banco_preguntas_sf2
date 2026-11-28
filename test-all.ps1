@@ -31,9 +31,9 @@ if ($exitCode -eq 0) {
     Write-Host " [OK] review-service:         25 pruebas (Hexagonal, JPA vs InMemory, consenso por ronda, @PreAuthorize)" -ForegroundColor Green
     Write-Host " [OK] notification-service:   9 pruebas (Factory Method, SmtpEmailAdapter, RabbitMQ)" -ForegroundColor Green
     Write-Host " [OK] audit-service:          5 pruebas (Observer, trazabilidad RabbitMQ, idempotencia)" -ForegroundColor Green
-    Write-Host " [OK] frontend:               5 pruebas (Login OIDC Keycloak simulado, vistas Swing)" -ForegroundColor Green
+    Write-Host " [OK] frontend:               6 pruebas (Login OIDC Keycloak simulado, alertas amigables, vistas Swing)" -ForegroundColor Green
     Write-Host " [OK] integration-tests:      2 pruebas (Flujo distribuido orientado a eventos)" -ForegroundColor Green
-    Write-Host " Total de pruebas: 110 aprobadas (0 fallas, 0 errores, 0 omitidas)" -ForegroundColor Cyan
+    Write-Host " Total de pruebas: 111 aprobadas (0 fallas, 0 errores, 0 omitidas)" -ForegroundColor Cyan
 } else {
     Write-Host "==========================================================" -ForegroundColor Red
     Write-Host "[FAIL] FALLA EN LA SUITE DE PRUEBAS (Codigo de salida: $exitCode)" -ForegroundColor Red

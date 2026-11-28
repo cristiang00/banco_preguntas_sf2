@@ -32,7 +32,7 @@ public class HistorialRevisionesDialog extends JDialog {
     private List<Map<String, Object>> rondasActuales;
 
     public HistorialRevisionesDialog(Window owner, Long preguntaId) {
-        super(owner, "Historial de Revisiones — Pregunta #" + preguntaId, ModalityType.APPLICATION_MODAL);
+        super(owner, "Historial de Revisiones - Pregunta #" + preguntaId, ModalityType.APPLICATION_MODAL);
         this.preguntaId = preguntaId;
         initComponents();
         cargarHistorial();
@@ -56,7 +56,7 @@ public class HistorialRevisionesDialog extends JDialog {
         lblTitulo.setFont(UIUtils.FONT_TITLE);
         lblTitulo.setForeground(UIUtils.COLOR_TEXT_PRIMARY);
 
-        JLabel lblSub = new JLabel("Pregunta ID: #" + preguntaId + " — Rondas cronológicas de evaluación");
+        JLabel lblSub = new JLabel("Pregunta ID: #" + preguntaId + " - Rondas cronológicas de evaluación");
         lblSub.setFont(UIUtils.FONT_REGULAR);
         lblSub.setForeground(UIUtils.COLOR_TEXT_MUTED);
 
@@ -122,11 +122,11 @@ public class HistorialRevisionesDialog extends JDialog {
                         sb.append("Evaluaciones registradas:\n");
                         for (int i = 0; i < evals.size(); i++) {
                             Map<String, Object> ev = evals.get(i);
-                            sb.append("• Criterio: ").append(ev.getOrDefault("criterio", "General"))
+                            sb.append("- Criterio: ").append(ev.getOrDefault("criterio", "General"))
                               .append(" | Calificación: ").append(ev.getOrDefault("calificacion", "N/A"));
                             Object com = ev.get("comentario");
                             if (com != null && !com.toString().isBlank()) {
-                                sb.append(" — ").append(com);
+                                sb.append(" - ").append(com);
                             }
                             sb.append("\n");
                         }
@@ -138,7 +138,7 @@ public class HistorialRevisionesDialog extends JDialog {
                     if (obs != null && !obs.isEmpty()) {
                         sb.append("Observaciones del revisor:\n");
                         for (int i = 0; i < obs.size(); i++) {
-                            sb.append("• [Observación ").append(i + 1).append("]: ").append(obs.get(i)).append("\n");
+                            sb.append("- Observación ").append(i + 1).append(": ").append(obs.get(i)).append("\n");
                         }
                     }
 
@@ -183,8 +183,8 @@ public class HistorialRevisionesDialog extends JDialog {
         JPanel pnlPaging = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         pnlPaging.setBackground(UIUtils.COLOR_SURFACE);
 
-        btnAnterior = new JButton("◀ Anterior");
-        btnSiguiente = new JButton("Siguiente ▶");
+        btnAnterior = new JButton("< Anterior");
+        btnSiguiente = new JButton("Siguiente >");
         lblPaginacion = new JLabel("Página 1 de 1");
         lblPaginacion.setFont(UIUtils.FONT_REGULAR);
 
@@ -258,20 +258,12 @@ public class HistorialRevisionesDialog extends JDialog {
                 }
 
             } catch (ApiException ex) {
-                if (ex.getStatusCode() == 403) {
-                    JOptionPane.showMessageDialog(this,
-                            "<html><b>Acceso Denegado (403):</b><br>" + ex.getMessage() + "</html>",
-                            "Permisos Insuficientes", JOptionPane.WARNING_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "consultar el historial de revisiones");
+                if (ex.getStatusCode() == 403 || ex.getStatusCode() == 401) {
                     dispose();
-                } else {
-                    JOptionPane.showMessageDialog(this,
-                            "Error al consultar historial: " + ex.getMessage(),
-                            "Error", JOptionPane.ERROR_MESSAGE);
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Error de comunicación con el gateway: " + ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "consultar el historial de revisiones");
             }
         });
     }

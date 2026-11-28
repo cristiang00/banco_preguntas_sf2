@@ -35,7 +35,7 @@ public class MainDashboardFrame extends JFrame {
         JPanel userPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         userPanel.setOpaque(false);
 
-        JLabel lblLogo = new JLabel("🎓 Saber Pro");
+        JLabel lblLogo = new JLabel("Saber Pro");
         lblLogo.setFont(new Font("Segoe UI", Font.BOLD, 18));
         lblLogo.setForeground(UIUtils.COLOR_PRIMARY);
 
@@ -43,12 +43,12 @@ public class MainDashboardFrame extends JFrame {
         lblUserInfo.setFont(UIUtils.FONT_REGULAR);
         lblUserInfo.setForeground(UIUtils.COLOR_TEXT_PRIMARY);
 
-        JLabel lblRoleBadge = new JLabel(" [" + usuario.getRol() + "] ");
+        JLabel lblRoleBadge = new JLabel(" " + usuario.getRol() + " ");
         lblRoleBadge.setFont(UIUtils.FONT_SUBTITLE);
         lblRoleBadge.setOpaque(true);
         lblRoleBadge.setBackground(new Color(224, 231, 255));
         lblRoleBadge.setForeground(new Color(67, 56, 202));
-        lblRoleBadge.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+        lblRoleBadge.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
 
         userPanel.add(lblLogo);
         userPanel.add(Box.createHorizontalStrut(15));
@@ -84,29 +84,29 @@ public class MainDashboardFrame extends JFrame {
 
         if ("AUTOR".equals(role)) {
             CrearPreguntaPanel crearPreguntaPanel = new CrearPreguntaPanel();
-            tabbedPane.addTab("📋 Mis Preguntas", listarPreguntasPanel);
-            tabbedPane.addTab("➕ Crear Pregunta", crearPreguntaPanel);
-            tabbedPane.addTab("🔔 Notificaciones", notificacionesPanel);
+            tabbedPane.addTab("Mis Preguntas", listarPreguntasPanel);
+            tabbedPane.addTab("Crear Pregunta", crearPreguntaPanel);
+            tabbedPane.addTab("Notificaciones", notificacionesPanel);
             listarPreguntasPanel.cargarDatos();
 
         } else if ("ADMINISTRADOR".equals(role)) {
             AsignarRevisoresPanel asignarRevisoresPanel = new AsignarRevisoresPanel();
             AuditoriaPanel auditoriaPanel = new AuditoriaPanel();
-            tabbedPane.addTab("👥 Asignar Revisores", asignarRevisoresPanel);
-            tabbedPane.addTab("📋 Banco de Preguntas", listarPreguntasPanel);
-            tabbedPane.addTab("📜 Bitácora de Auditoría", auditoriaPanel);
-            tabbedPane.addTab("🔔 Notificaciones", notificacionesPanel);
+            tabbedPane.addTab("Asignar Revisores", asignarRevisoresPanel);
+            tabbedPane.addTab("Banco de Preguntas", listarPreguntasPanel);
+            tabbedPane.addTab("Bitácora de Auditoría", auditoriaPanel);
+            tabbedPane.addTab("Notificaciones", notificacionesPanel);
             asignarRevisoresPanel.cargarDatos();
 
         } else if ("REVISOR".equals(role)) {
             RevisionesAsignadasPanel revisionesPanel = new RevisionesAsignadasPanel();
-            tabbedPane.addTab("🔍 Mis Revisiones Asignadas", revisionesPanel);
-            tabbedPane.addTab("🔔 Notificaciones", notificacionesPanel);
+            tabbedPane.addTab("Mis Revisiones Asignadas", revisionesPanel);
+            tabbedPane.addTab("Notificaciones", notificacionesPanel);
             revisionesPanel.cargarDatos();
 
         } else {
-            tabbedPane.addTab("📋 Preguntas", listarPreguntasPanel);
-            tabbedPane.addTab("🔔 Notificaciones", notificacionesPanel);
+            tabbedPane.addTab("Preguntas", listarPreguntasPanel);
+            tabbedPane.addTab("Notificaciones", notificacionesPanel);
             listarPreguntasPanel.cargarDatos();
         }
 

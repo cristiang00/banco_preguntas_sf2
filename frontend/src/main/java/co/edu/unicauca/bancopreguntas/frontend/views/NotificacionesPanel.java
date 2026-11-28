@@ -19,7 +19,7 @@ public class NotificacionesPanel extends JPanel {
         setBackground(UIUtils.COLOR_BACKGROUND);
         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
-        JLabel lblTitulo = new JLabel("Bandeja de Notificaciones y Correos Electrónicos (Email Adapter)", SwingConstants.CENTER);
+        JLabel lblTitulo = new JLabel("Bandeja de Notificaciones y Correos Electrónicos", SwingConstants.CENTER);
         lblTitulo.setFont(UIUtils.FONT_TITLE);
         lblTitulo.setForeground(UIUtils.COLOR_PRIMARY);
         add(lblTitulo, BorderLayout.NORTH);
@@ -66,7 +66,7 @@ public class NotificacionesPanel extends JPanel {
                     });
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error cargando notificaciones: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "cargar las notificaciones");
             }
         });
     }

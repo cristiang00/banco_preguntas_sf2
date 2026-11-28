@@ -241,7 +241,7 @@ curl -X POST http://localhost:8089/realms/saberpro/protocol/openid-connect/token
 .\mvnw.cmd test -pl services/review-service
 ```
 
-### Cobertura automatizada verificada (`110/110` pruebas en verde)
+### Cobertura automatizada verificada (`111/111` pruebas en verde)
 
 | Módulo | Pruebas | Estado |
 |--------|---------|--------|
@@ -253,7 +253,7 @@ curl -X POST http://localhost:8089/realms/saberpro/protocol/openid-connect/token
 | `review-service` | 25 | ✅ |
 | `notification-service` | 9 | ✅ |
 | `audit-service` | 5 | ✅ |
-| `frontend` | 5 | ✅ |
+| `frontend` | 6 | ✅ |
 | `integration-tests` | 2 | ✅ |
 
 ---

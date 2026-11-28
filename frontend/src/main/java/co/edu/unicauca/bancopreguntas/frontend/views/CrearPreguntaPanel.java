@@ -234,7 +234,7 @@ public class CrearPreguntaPanel extends JPanel {
             } catch (ApiException ex) {
                 mostrarErroresValidacion(ex);
             } catch (Exception ex) {
-                mostrarBannerError("Error comunicándose con el API Gateway: " + ex.getMessage());
+                mostrarBannerError(UIUtils.formatUserFriendlyError(ex, "guardar la pregunta"));
             } finally {
                 btnGuardar.setEnabled(true);
             }
@@ -244,28 +244,31 @@ public class CrearPreguntaPanel extends JPanel {
     private void mostrarBannerExito(String mensaje) {
         bannerPanel.setBackground(new Color(220, 252, 231));
         bannerLabel.setForeground(new Color(22, 101, 52));
-        bannerLabel.setText("✓ " + mensaje);
+        bannerLabel.setText("<html>" + mensaje.replace("\n", "<br>") + "</html>");
         bannerPanel.setVisible(true);
     }
 
     private void mostrarBannerError(String mensaje) {
         bannerPanel.setBackground(new Color(254, 226, 226));
         bannerLabel.setForeground(new Color(153, 27, 27));
-        bannerLabel.setText("✗ " + mensaje);
+        bannerLabel.setText("<html>" + mensaje.replace("\n", "<br>") + "</html>");
         bannerPanel.setVisible(true);
     }
 
     private void mostrarErroresValidacion(ApiException ex) {
-        StringBuilder sb = new StringBuilder("Errores de validación detectados:\n");
         List<ErrorValidacionDTO> errores = ex.getErroresValidacion();
 
         if (errores.isEmpty()) {
-            sb.append(ex.getMessage());
-        } else {
-            for (ErrorValidacionDTO err : errores) {
-                sb.append("• ").append(err.getMensaje()).append("\n");
-                highlightField(err.getCodigo(), err.getCampo());
-            }
+            mostrarBannerError(UIUtils.formatUserFriendlyError(ex, "guardar la pregunta"));
+            return;
+        }
+        StringBuilder sb = new StringBuilder("Revisa los siguientes datos antes de guardar:\n");
+        for (ErrorValidacionDTO err : errores) {
+            sb.append("- ").append(err.getMensaje()).append("\n");
+            highlightField(err.getCodigo(), err.getCampo());
+        }
+        if (ex.getStatusCode() > 0) {
+            sb.append("Código: ").append(ex.getStatusCode());
         }
         mostrarBannerError(sb.toString().trim());
     }

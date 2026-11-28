@@ -90,7 +90,7 @@ public class AuditoriaPanel extends JPanel {
                     });
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error cargando auditoría: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "consultar la bitácora de auditoría");
             }
         });
     }

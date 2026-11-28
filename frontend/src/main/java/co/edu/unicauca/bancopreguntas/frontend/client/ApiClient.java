@@ -131,8 +131,7 @@ public class ApiClient {
         try (OutputStream os = conn.getOutputStream()) {
             os.write(formBody.getBytes(StandardCharsets.UTF_8));
         } catch (IOException ioEx) {
-            throw new IOException("No se pudo conectar con Keycloak/OIDC en " + keycloakTokenUrl
-                    + " (verifique que el puerto 8089 esté activo con Keycloak o scripts/LocalOidcServer.java)", ioEx);
+            throw new IOException("No fue posible conectar con el servicio de autenticación. Verifica que los servicios del sistema estén encendidos.", ioEx);
         }
 
         int code = conn.getResponseCode();
@@ -145,13 +144,13 @@ public class ApiClient {
             if (accessToken != null) {
                 return parseKeycloakToken(accessToken, username);
             }
-            throw new ApiException(401, "Keycloak no retornó un access_token válido");
+            throw new ApiException(401, "No fue posible validar tu sesión. Intenta ingresar nuevamente.");
         } else if (code == 400 || code == 401) {
-            throw new ApiException(401, "Credenciales inválidas en Keycloak");
+            throw new ApiException(401, "Usuario o contraseña incorrectos. Verifica tus datos e intenta nuevamente.");
         } else if (code == 403) {
-            throw new ApiException(403, "Acceso denegado por Keycloak");
+            throw new ApiException(403, "Tu cuenta no tiene permisos para ingresar al sistema.");
         }
-        throw new ApiException(code, "Error autenticando contra Keycloak (HTTP " + code + ")");
+        throw new ApiException(code, "No fue posible iniciar sesión en este momento. Intenta nuevamente más tarde.");
     }
 
     private TokenResponseDTO parseKeycloakToken(String token, String fallbackUsername) {
@@ -535,27 +534,34 @@ public class ApiClient {
     private ApiException handleApiError(HttpResponseData response) {
         String body = response.getBody();
         List<ErrorValidacionDTO> errores = new ArrayList<>();
-        String message = "Error " + response.getStatusCode();
+        String message = switch (response.getStatusCode()) {
+            case 400 -> "Algunos datos ingresados no son válidos. Revisa la información e intenta nuevamente.";
+            case 401 -> "Tu sesión expiró o no es válida. Por favor vuelve a iniciar sesión.";
+            case 403 -> "No tienes permisos suficientes para realizar esta acción.";
+            case 404 -> "No se encontró el registro solicitado.";
+            case 409 -> "Esta acción no está disponible en el estado actual del registro.";
+            default -> "El servicio no está disponible en este momento. Intenta nuevamente más tarde.";
+        };
 
         try {
             // Intenta deserializar como ResultadoValidacionDTO
             ResultadoValidacionDTO resultado = objectMapper.readValue(body, ResultadoValidacionDTO.class);
             if (resultado.getErrores() != null && !resultado.getErrores().isEmpty()) {
                 errores.addAll(resultado.getErrores());
-                message = "Errores de validación (" + errores.size() + ")";
+                message = "Por favor corrige los campos señalados antes de continuar.";
             }
         } catch (Exception ignored) {
             try {
                 // Intenta deserializar como Map genérico
                 Map<String, Object> map = objectMapper.readValue(body, new TypeReference<Map<String, Object>>() {});
-                if (map.containsKey("error")) {
+                if (map.containsKey("error") && map.get("error") != null && !String.valueOf(map.get("error")).isBlank()) {
                     message = String.valueOf(map.get("error"));
-                } else if (map.containsKey("mensaje")) {
+                } else if (map.containsKey("mensaje") && map.get("mensaje") != null && !String.valueOf(map.get("mensaje")).isBlank()) {
                     message = String.valueOf(map.get("mensaje"));
                 }
             } catch (Exception ignored2) {
-                if (body != null && !body.isBlank()) {
-                    message = body;
+                if (body != null && !body.isBlank() && !body.trim().startsWith("{")) {
+                    message = body.trim();
                 }
             }
         }

@@ -108,7 +108,7 @@ public class RevisionesAsignadasPanel extends JPanel {
         JPanel pnlPaginacion = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
         pnlPaginacion.setOpaque(false);
 
-        btnAnterior = new JButton("◀ Anterior");
+        btnAnterior = new JButton("< Anterior");
         UIUtils.stylizeSecondaryButton(btnAnterior);
         btnAnterior.addActionListener(e -> {
             if (paginaActual > 0) {
@@ -120,7 +120,7 @@ public class RevisionesAsignadasPanel extends JPanel {
         lblPagina = new JLabel("Página 1 de 1");
         lblPagina.setFont(UIUtils.FONT_SUBTITLE);
 
-        btnSiguiente = new JButton("Siguiente ▶");
+        btnSiguiente = new JButton("Siguiente >");
         UIUtils.stylizeSecondaryButton(btnSiguiente);
         btnSiguiente.addActionListener(e -> {
             if (paginaActual < totalPaginas - 1) {
@@ -186,8 +186,7 @@ public class RevisionesAsignadasPanel extends JPanel {
                     });
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error cargando revisiones asignadas: " + ex.getMessage(), "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "cargar tus revisiones asignadas");
             }
         });
     }
@@ -250,7 +249,7 @@ public class RevisionesAsignadasPanel extends JPanel {
         JPanel pnlBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 8));
         pnlBtns.setOpaque(false);
 
-        JButton btnAprobar = new JButton("✓ Aprobar Pregunta");
+        JButton btnAprobar = new JButton("Aprobar Pregunta");
         btnAprobar.setBackground(UIUtils.COLOR_SUCCESS);
         btnAprobar.setForeground(Color.WHITE);
         btnAprobar.setFont(UIUtils.FONT_SUBTITLE);
@@ -275,13 +274,12 @@ public class RevisionesAsignadasPanel extends JPanel {
                     dialog.dispose();
                     cargarDatos();
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(dialog, "Error emitiendo decisión: " + ex.getMessage(), "Error",
-                            JOptionPane.ERROR_MESSAGE);
+                    UIUtils.showFriendlyError(dialog, ex, "registrar la aprobación");
                 }
             }
         });
 
-        JButton btnRechazar = new JButton("✗ Rechazar Pregunta");
+        JButton btnRechazar = new JButton("Rechazar Pregunta");
         btnRechazar.setBackground(UIUtils.COLOR_ERROR);
         btnRechazar.setForeground(Color.WHITE);
         btnRechazar.setFont(UIUtils.FONT_SUBTITLE);
@@ -311,8 +309,7 @@ public class RevisionesAsignadasPanel extends JPanel {
                     dialog.dispose();
                     cargarDatos();
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(dialog, "Error emitiendo decisión: " + ex.getMessage(), "Error",
-                            JOptionPane.ERROR_MESSAGE);
+                    UIUtils.showFriendlyError(dialog, ex, "registrar el rechazo");
                 }
             }
         });

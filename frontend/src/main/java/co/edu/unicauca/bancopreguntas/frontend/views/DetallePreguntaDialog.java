@@ -81,7 +81,7 @@ public class DetallePreguntaDialog extends JDialog {
                 boolean esCorrecta = op.getClave() != null
                         && op.getClave().equalsIgnoreCase(pregunta.getRespuestaCorrecta());
                 sbOpciones.append(op.getClave()).append(") ").append(op.getTexto())
-                        .append(esCorrecta ? " [CORRECTA]" : "").append("\n");
+                        .append(esCorrecta ? " (Correcta)" : "").append("\n");
             }
         }
         addCampo(infoPanel, gbc, y++, "Opciones de Respuesta:", sbOpciones.toString().trim());
@@ -187,8 +187,7 @@ public class DetallePreguntaDialog extends JDialog {
                     onActualizado.run();
                 dispose();
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error enviando a revisión: " + ex.getMessage(), "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "enviar la pregunta a revisión");
             }
         }
     }
@@ -197,7 +196,7 @@ public class DetallePreguntaDialog extends JDialog {
         int confirm = JOptionPane.showConfirmDialog(
                 this,
                 "¿Desea crear una nueva versión mejorada de la pregunta #" + pregunta.getId() + "?\n"
-                        + "La pregunta pasará al estado BORRADOR (Versión " + (pregunta.getVersion() + 1) + ") y podrá ser editada y reenviada.",
+                        + "La pregunta pasará al estado Borrador (Versión " + (pregunta.getVersion() + 1) + ") y podrá ser editada y reenviada.",
                 "Confirmar Nueva Versión",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE);
@@ -211,14 +210,13 @@ public class DetallePreguntaDialog extends JDialog {
                     onActualizado.run();
                 dispose();
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error al crear nueva versión: " + ex.getMessage(), "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "crear una nueva versión de la pregunta");
             }
         }
     }
 
     public void abrirEdicionBorrador() {
-        JDialog editDialog = new JDialog(this, "Editar Borrador — Pregunta #" + pregunta.getId() + " (v" + pregunta.getVersion() + ")", true);
+        JDialog editDialog = new JDialog(this, "Editar Borrador - Pregunta #" + pregunta.getId() + " (v" + pregunta.getVersion() + ")", true);
         editDialog.setSize(640, 620);
         editDialog.setLocationRelativeTo(this);
 
@@ -305,7 +303,7 @@ public class DetallePreguntaDialog extends JDialog {
                 if (onActualizado != null) onActualizado.run();
                 if (isVisible()) dispose();
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(editDialog, "Error al actualizar borrador: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(editDialog, ex, "actualizar el borrador");
             }
         });
         JButton btnCancelar = new JButton("Cancelar");

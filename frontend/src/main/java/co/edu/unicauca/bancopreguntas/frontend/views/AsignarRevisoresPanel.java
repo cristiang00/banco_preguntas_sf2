@@ -114,7 +114,7 @@ public class AsignarRevisoresPanel extends JPanel {
                 listaRevisores.setBorder(UIUtils.BORDER_DEFAULT);
 
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error cargando datos: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "cargar las preguntas pendientes y revisores");
             }
         });
     }
@@ -164,7 +164,7 @@ public class AsignarRevisoresPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "Revisores asignados exitosamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
                 cargarDatos();
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error asignando revisores: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "asignar revisores a la pregunta");
             }
         }
     }

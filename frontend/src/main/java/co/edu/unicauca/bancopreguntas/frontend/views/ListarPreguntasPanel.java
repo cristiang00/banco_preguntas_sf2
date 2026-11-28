@@ -170,7 +170,7 @@ public class ListarPreguntasPanel extends JPanel {
                         JOptionPane.showMessageDialog(this, "Pregunta enviada a revisión correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
                         cargarDatos();
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(this, "Error enviando a revisión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                        UIUtils.showFriendlyError(this, ex, "enviar la pregunta a revisión");
                     }
                 }
             } else {
@@ -242,7 +242,7 @@ public class ListarPreguntasPanel extends JPanel {
                                 "Éxito", JOptionPane.INFORMATION_MESSAGE);
                         cargarDatos();
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(this, "Error al crear nueva versión: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                        UIUtils.showFriendlyError(this, ex, "crear una nueva versión de la pregunta");
                     }
                 }
             } else {
@@ -343,7 +343,7 @@ public class ListarPreguntasPanel extends JPanel {
                 actualizarEstadoBotonNuevaVersion();
 
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error cargando preguntas desde API Gateway: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                UIUtils.showFriendlyError(this, ex, "cargar el listado de preguntas");
             }
         });
     }
